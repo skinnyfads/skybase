@@ -3,6 +3,7 @@ package com.example.skybase.jmnews
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface JmNewsApi {
@@ -11,6 +12,11 @@ interface JmNewsApi {
         @Query("page") page: Int,
         @Query("limit") limit: Int
     ): FeedResponse
+
+    @GET("articles/{id}")
+    suspend fun getArticle(
+        @Path("id") id: String
+    ): ArticleDetailResponse
 }
 
 object JmNewsApiClient {
