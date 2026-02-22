@@ -10,6 +10,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.Alignment
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.Contrast
@@ -106,7 +114,7 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(innerPadding)
-                            .padding(horizontal = 16.dp, vertical = 20.dp)
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
                     ) {
                         when (selectedTab) {
                             0 -> JmNewsFragment(modifier = Modifier.fillMaxSize(), listState = jmNewsListState)
@@ -129,66 +137,86 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 fun ThemeMenuBar(
     selectedMode: ThemeMode,
     onModeSelected: (ThemeMode) -> Unit
 ) {
     var showMenu by rememberSaveable { mutableStateOf(false) }
 
-    TopAppBar(
-        title = { Text(text = "SkyBase") },
-        actions = {
-            IconButton(onClick = { showMenu = true }) {
-                Icon(
-                    imageVector = Icons.Filled.MoreVert,
-                    contentDescription = "Open menu"
-                )
-            }
+    val topPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
-            DropdownMenu(
-                expanded = showMenu,
-                onDismissRequest = { showMenu = false }
-            ) {
-                Text(
-                    text = "Theme",
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+    androidx.compose.material3.Surface(
+        color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = topPadding)
+                .height(48.dp)
+                .padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "SkyBase",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 12.dp)
+            )
+
+            Box {
+                IconButton(onClick = { showMenu = true }) {
+                    Icon(
+                        imageVector = Icons.Filled.MoreVert,
+                        contentDescription = "Open menu"
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
                 ) {
-                    ThemeIconButton(
-                        icon = Icons.Filled.LightMode,
-                        label = ThemeMode.LIGHT.label,
-                        selected = selectedMode == ThemeMode.LIGHT,
-                        onClick = {
-                            onModeSelected(ThemeMode.LIGHT)
-                            showMenu = false
-                        }
+                    Text(
+                        text = "Theme",
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                     )
-                    ThemeIconButton(
-                        icon = Icons.Filled.DarkMode,
-                        label = ThemeMode.DARK.label,
-                        selected = selectedMode == ThemeMode.DARK,
-                        onClick = {
-                            onModeSelected(ThemeMode.DARK)
-                            showMenu = false
-                        }
-                    )
-                    ThemeIconButton(
-                        icon = Icons.Filled.Contrast,
-                        label = ThemeMode.AMOLED.label,
-                        selected = selectedMode == ThemeMode.AMOLED,
-                        onClick = {
-                            onModeSelected(ThemeMode.AMOLED)
-                            showMenu = false
-                        }
-                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        ThemeIconButton(
+                            icon = Icons.Filled.LightMode,
+                            label = ThemeMode.LIGHT.label,
+                            selected = selectedMode == ThemeMode.LIGHT,
+                            onClick = {
+                                onModeSelected(ThemeMode.LIGHT)
+                                showMenu = false
+                            }
+                        )
+                        ThemeIconButton(
+                            icon = Icons.Filled.DarkMode,
+                            label = ThemeMode.DARK.label,
+                            selected = selectedMode == ThemeMode.DARK,
+                            onClick = {
+                                onModeSelected(ThemeMode.DARK)
+                                showMenu = false
+                            }
+                        )
+                        ThemeIconButton(
+                            icon = Icons.Filled.Contrast,
+                            label = ThemeMode.AMOLED.label,
+                            selected = selectedMode == ThemeMode.AMOLED,
+                            onClick = {
+                                onModeSelected(ThemeMode.AMOLED)
+                                showMenu = false
+                            }
+                        )
+                    }
                 }
             }
         }
-    )
+    }
 }
 
 @Composable
@@ -221,20 +249,34 @@ fun BottomNavBar(
         Icons.Filled.School to "Learning Social"
     )
 
-    NavigationBar {
-        items.forEachIndexed { index, item ->
-            NavigationBarItem(
-                selected = selectedItem == index,
-                onClick = { onItemSelected(index) },
-                icon = {
+    val bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+
+    androidx.compose.material3.Surface(
+        color = androidx.compose.material3.NavigationBarDefaults.containerColor,
+        tonalElevation = androidx.compose.material3.NavigationBarDefaults.Elevation,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = bottomPadding)
+                .height(48.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            items.forEachIndexed { index, item ->
+                IconButton(onClick = { onItemSelected(index) }) {
                     Icon(
                         imageVector = item.first,
-                        contentDescription = item.second
+                        contentDescription = item.second,
+                        tint = if (selectedItem == index) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
                     )
-                },
-                label = {},
-                alwaysShowLabel = false
-            )
+                }
+            }
         }
     }
 }
