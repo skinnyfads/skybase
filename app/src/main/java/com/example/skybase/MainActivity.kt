@@ -44,7 +44,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            var selectedThemeModeIndex by rememberSaveable { mutableIntStateOf(0) }
+            var selectedThemeModeIndex by rememberSaveable {
+                mutableIntStateOf(ThemeMode.DARK.ordinal)
+            }
             val themeMode = ThemeMode.entries[selectedThemeModeIndex]
 
             SkyBaseTheme(

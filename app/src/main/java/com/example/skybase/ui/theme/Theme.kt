@@ -58,7 +58,7 @@ private val AmoledColorScheme = darkColorScheme(
 
 @Composable
 fun SkyBaseTheme(
-    themeMode: ThemeMode = ThemeMode.LIGHT,
+    themeMode: ThemeMode = ThemeMode.DARK,
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
