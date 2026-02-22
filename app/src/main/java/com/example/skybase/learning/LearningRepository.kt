@@ -13,8 +13,7 @@ data class FeedPost(
     val content: String? = null,
     @SerializedName("random_key")
     val randomKey: Double? = null,
-    @SerializedName("biased_score")
-    val biasedScore: Double? = null,
+    val bucket: Int? = null,
     @SerializedName("is_deleted")
     val isDeleted: Int? = null,
     @SerializedName("created_at")
@@ -24,9 +23,20 @@ data class FeedPost(
 )
 
 data class PostsCursor(
-    @SerializedName("biased_score")
-    val biasedScore: Double? = null,
+    val bucket: Int? = null,
+    @SerializedName("random_key")
+    val randomKey: Double? = null,
     val id: String? = null
+)
+
+data class SyncInitResponse(
+    val token: String
+)
+
+data class SyncSeenRequest(
+    val token: String,
+    @SerializedName("post_ids")
+    val postIds: List<String>
 )
 
 class LearningRepository(
@@ -34,11 +44,23 @@ class LearningRepository(
 ) {
     suspend fun fetchPosts(
         limit: Int,
-        cursorScore: Double? = null,
+        syncToken: String? = null,
+        cursorBucket: Int? = null,
+        cursorRandomKey: Double? = null,
         cursorId: String? = null
     ): FeedPostsResponse = api.getPosts(
         limit = limit,
-        cursorScore = cursorScore,
+        syncToken = syncToken,
+        cursorBucket = cursorBucket,
+        cursorRandomKey = cursorRandomKey,
         cursorId = cursorId
     )
+
+    suspend fun initSyncToken(): String {
+        return api.initSyncToken().token
+    }
+
+    suspend fun markPostsAsSeen(token: String, postIds: List<String>) {
+        api.markPostsAsSeen(SyncSeenRequest(token, postIds))
+    }
 }

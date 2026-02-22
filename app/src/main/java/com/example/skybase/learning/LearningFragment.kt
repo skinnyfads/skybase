@@ -101,6 +101,14 @@ fun LearningFragment(
             }
         ) { index ->
             val post = uiState.items[index]
+
+            val postId = post.id
+            if (postId != null) {
+                LaunchedEffect(postId) {
+                    viewModel.markPostAsSeen(postId)
+                }
+            }
+
             PostCard(post = post)
         }
 
