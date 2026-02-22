@@ -24,6 +24,11 @@ interface LearningApi {
     suspend fun markPostsAsSeen(
         @Body request: SyncSeenRequest
     )
+
+    @POST("api/sync/verify")
+    suspend fun verifySyncToken(
+        @Body request: SyncVerifyRequest
+    ): SyncVerifyResponse
 }
 
 object LearningApiClient {

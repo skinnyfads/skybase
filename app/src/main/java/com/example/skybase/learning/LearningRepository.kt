@@ -39,6 +39,14 @@ data class SyncSeenRequest(
     val postIds: List<String>
 )
 
+data class SyncVerifyRequest(
+    val token: String
+)
+
+data class SyncVerifyResponse(
+    val valid: Boolean
+)
+
 class LearningRepository(
     private val api: LearningApi
 ) {
@@ -62,5 +70,14 @@ class LearningRepository(
 
     suspend fun markPostsAsSeen(token: String, postIds: List<String>) {
         api.markPostsAsSeen(SyncSeenRequest(token, postIds))
+    }
+
+    suspend fun verifySyncToken(token: String): Boolean {
+        return try {
+            val response = api.verifySyncToken(SyncVerifyRequest(token))
+            response.valid
+        } catch (e: Exception) {
+            false
+        }
     }
 }

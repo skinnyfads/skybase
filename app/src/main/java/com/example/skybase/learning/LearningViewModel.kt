@@ -16,7 +16,10 @@ data class LearningUiState(
     val items: List<FeedPost> = emptyList(),
     val isLoading: Boolean = false,
     val hasNextPage: Boolean = true,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val syncToken: String? = null,
+    val isVerifyingToken: Boolean = false,
+    val verifyTokenError: String? = null
 )
 
 class LearningViewModel(application: Application) : AndroidViewModel(application) {
@@ -25,7 +28,7 @@ class LearningViewModel(application: Application) : AndroidViewModel(application
     private val _uiState = MutableStateFlow(LearningUiState())
     val uiState: StateFlow<LearningUiState> = _uiState.asStateFlow()
 
-    private var syncToken: String? = prefs.getString("sync_token", null)
+    private var currentSyncToken: String? = prefs.getString("sync_token", null)
 
     private var nextCursorBucket: Int? = null
     private var nextCursorRandomKey: Double? = null
@@ -35,18 +38,55 @@ class LearningViewModel(application: Application) : AndroidViewModel(application
     private var isSyncingSeen = false
 
     init {
+        _uiState.update { it.copy(syncToken = currentSyncToken) }
         viewModelScope.launch {
-            if (syncToken == null) {
+            if (currentSyncToken == null) {
                 try {
                     val token = repository.initSyncToken()
-                    syncToken = token
-                    prefs.edit().putString("sync_token", token).apply()
+                    setSyncToken(token)
                 } catch (e: Exception) {
                     // Ignore, will fetch posts without token
                 }
             }
             loadNextPage()
         }
+    }
+
+    private fun setSyncToken(token: String) {
+        currentSyncToken = token
+        prefs.edit().putString("sync_token", token).apply()
+        _uiState.update { it.copy(syncToken = token) }
+    }
+
+    fun verifyAndUpdateToken(newToken: String) {
+        if (newToken.isBlank() || newToken == currentSyncToken) {
+            _uiState.update { it.copy(verifyTokenError = "Invalid or same token") }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isVerifyingToken = true, verifyTokenError = null) }
+            val isValid = repository.verifySyncToken(newToken)
+            if (isValid) {
+                // Save new token
+                setSyncToken(newToken)
+
+                // Clear state and reload feed
+                _uiState.update { it.copy(items = emptyList(), hasNextPage = true, isVerifyingToken = false) }
+                nextCursorBucket = null
+                nextCursorRandomKey = null
+                nextCursorId = null
+                seenPostsQueue.clear()
+
+                loadNextPage()
+            } else {
+                _uiState.update { it.copy(isVerifyingToken = false, verifyTokenError = "Invalid token") }
+            }
+        }
+    }
+
+    fun clearVerifyError() {
+        _uiState.update { it.copy(verifyTokenError = null) }
     }
 
     fun loadNextPage() {
@@ -58,7 +98,7 @@ class LearningViewModel(application: Application) : AndroidViewModel(application
             try {
                 val response = repository.fetchPosts(
                     limit = PAGE_SIZE,
-                    syncToken = syncToken,
+                    syncToken = currentSyncToken,
                     cursorBucket = nextCursorBucket,
                     cursorRandomKey = nextCursorRandomKey,
                     cursorId = nextCursorId
@@ -96,7 +136,7 @@ class LearningViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun markPostAsSeen(postId: String) {
-        val currentToken = syncToken ?: return
+        val tokenToUse = currentSyncToken ?: return
         seenPostsQueue.add(postId)
         if (!isSyncingSeen) {
             isSyncingSeen = true
@@ -108,7 +148,7 @@ class LearningViewModel(application: Application) : AndroidViewModel(application
 
                 if (idsToSync.isNotEmpty()) {
                     try {
-                        repository.markPostsAsSeen(currentToken, idsToSync)
+                        repository.markPostsAsSeen(tokenToUse, idsToSync)
                     } catch (e: Exception) {
                         seenPostsQueue.addAll(idsToSync)
                     }
