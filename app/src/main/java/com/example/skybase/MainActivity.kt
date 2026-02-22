@@ -1,5 +1,6 @@
 package com.example.skybase
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -43,9 +44,15 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        val preferences = getSharedPreferences(THEME_PREFS_NAME, Context.MODE_PRIVATE)
+        val savedThemeModeIndex = preferences
+            .getInt(THEME_MODE_INDEX_KEY, ThemeMode.DARK.ordinal)
+            .coerceIn(0, ThemeMode.entries.lastIndex)
+
         setContent {
             var selectedThemeModeIndex by rememberSaveable {
-                mutableIntStateOf(ThemeMode.DARK.ordinal)
+                mutableIntStateOf(savedThemeModeIndex)
             }
             val themeMode = ThemeMode.entries[selectedThemeModeIndex]
 
@@ -58,7 +65,13 @@ class MainActivity : ComponentActivity() {
                     topBar = {
                         ThemeMenuBar(
                             selectedMode = themeMode,
-                            onModeSelected = { selectedThemeModeIndex = it.ordinal }
+                            onModeSelected = { mode ->
+                                val modeIndex = mode.ordinal
+                                selectedThemeModeIndex = modeIndex
+                                preferences.edit()
+                                    .putInt(THEME_MODE_INDEX_KEY, modeIndex)
+                                    .apply()
+                            }
                         )
                     },
                     bottomBar = { BottomNavBar() }
@@ -74,6 +87,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private companion object {
+        const val THEME_PREFS_NAME = "skybase_theme_prefs"
+        const val THEME_MODE_INDEX_KEY = "theme_mode_index"
     }
 }
 
