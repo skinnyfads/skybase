@@ -12,10 +12,15 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -26,6 +31,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -249,7 +255,8 @@ private fun ArticleTokenContent(tokens: List<ArticleToken>) {
 
                     DropdownMenu(
                         expanded = selectedTokenIndex == tokenIndex,
-                        onDismissRequest = { selectedTokenIndex = -1 }
+                        onDismissRequest = { selectedTokenIndex = -1 },
+                        modifier = Modifier.widthIn(max = 260.dp)
                     ) {
                         TokenInfoMenu(token = token)
                     }
@@ -260,44 +267,75 @@ private fun ArticleTokenContent(tokens: List<ArticleToken>) {
 }
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun TokenInfoMenu(token: ArticleToken) {
-    val surface = token.surface?.takeIf { it.isNotBlank() } ?: "-"
-    val dictForm = token.dictForm?.takeIf { it.isNotBlank() } ?: "-"
-    val reading = token.reading?.takeIf { it.isNotBlank() } ?: "-"
-    val pos = token.pos?.filter { it.isNotBlank() }?.joinToString(", ")?.takeIf { it.isNotBlank() } ?: "-"
-    val reason = token.reason?.takeIf { it.isNotBlank() } ?: "-"
-    val meaningText = token.meanings
-        ?.filter { it.isNotBlank() }
-        ?.joinToString(", ")
-        ?.takeIf { it.isNotBlank() }
-        ?: "-"
+    val reading = token.reading?.takeIf { it.isNotBlank() }
+    val dictForm = token.dictForm?.takeIf { it.isNotBlank() }
+    val posList = token.pos?.filter { it.isNotBlank() }.orEmpty()
+    val meanings = token.meanings?.filter { it.isNotBlank() }.orEmpty()
 
-    Text(
-        text = "Word: $surface",
-        style = MaterialTheme.typography.labelLarge,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
-    )
-    HorizontalDivider()
-    Text(
-        text = "Base: $dictForm",
-        style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-    )
-    Text(
-        text = "Reading: $reading",
-        style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-    )
-    Text(
-        text = "Reason: $reason",
-        style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-    )
-    Text(
-        text = "Meaning: $meaningText",
-        style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-    )
+    Column(
+        modifier = Modifier
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .heightIn(max = 240.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Top row: reading (left) + base word (right)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Bottom
+        ) {
+            Text(
+                text = reading ?: dictForm ?: "-",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+            if (dictForm != null && reading != null) {
+                Text(
+                    text = dictForm,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        HorizontalDivider()
+
+        // POS tags as chips
+        if (posList.isNotEmpty()) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                posList.forEach { tag ->
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Text(
+                            text = tag,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        // Numbered meanings
+        if (meanings.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                meanings.forEachIndexed { i, meaning ->
+                    Text(
+                        text = "${i + 1}. $meaning",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
