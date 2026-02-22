@@ -1,6 +1,7 @@
 package com.example.skybase.jmnews
 
 import android.text.format.DateUtils
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -151,6 +152,8 @@ private fun JmNewsArticleDetail(
 ) {
     val article = uiState.articleDetail
     val articleErrorMessage = uiState.articleErrorMessage
+
+    BackHandler(onBack = onBack)
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
