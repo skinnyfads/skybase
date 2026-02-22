@@ -1,6 +1,7 @@
 package com.example.skybase.jmnews
 
 import android.text.format.DateUtils
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -235,8 +237,8 @@ private fun ArticleTokenContent(tokens: List<ArticleToken>) {
                     Text(
                         text = tokenText,
                         style = MaterialTheme.typography.bodyLarge,
-                        color = if (token.reason != null) {
-                            MaterialTheme.colorScheme.primary
+                        color = if (selectedTokenIndex == tokenIndex) {
+                            if (isSystemInDarkTheme()) Color(0xFFFFAB91) else Color(0xFFD84315)
                         } else {
                             MaterialTheme.colorScheme.onSurface
                         },
