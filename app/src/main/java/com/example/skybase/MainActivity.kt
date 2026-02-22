@@ -92,6 +92,7 @@ class MainActivity : ComponentActivity() {
                     ) {
                         when (selectedTab) {
                             0 -> JmNewsFragment(modifier = Modifier.fillMaxSize())
+                            1 -> com.example.skybase.learning.LearningFragment(modifier = Modifier.fillMaxSize())
                             else -> Text(
                                 text = "Learning Social",
                                 style = MaterialTheme.typography.titleMedium

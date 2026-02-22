@@ -14,8 +14,10 @@ retrofit = "2.11.0"
 converterGson = "2.11.0"
 kotlinxCoroutines = "1.8.1"
 desugarJdkLibs = "2.1.5"
+composeMarkdown = "0.5.4"
 
 [libraries]
+compose-markdown = { group = "com.github.jeziellago", name = "compose-markdown", version.ref = "composeMarkdown" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
