@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Schedule
@@ -43,11 +44,11 @@ import java.util.TimeZone
 @Composable
 fun LearningFragment(
     modifier: Modifier = Modifier,
-    viewModel: LearningViewModel = viewModel()
+    viewModel: LearningViewModel = viewModel(),
+    listState: LazyListState = rememberLazyListState()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    val listState = rememberLazyListState()
     val shouldLoadMore by remember {
         derivedStateOf {
             val totalCount = listState.layoutInfo.totalItemsCount

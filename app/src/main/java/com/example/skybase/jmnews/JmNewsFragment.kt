@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -45,7 +46,8 @@ import java.util.TimeZone
 @Composable
 fun JmNewsFragment(
     modifier: Modifier = Modifier,
-    viewModel: JmNewsViewModel = viewModel()
+    viewModel: JmNewsViewModel = viewModel(),
+    listState: LazyListState = rememberLazyListState()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -60,7 +62,6 @@ fun JmNewsFragment(
         return
     }
 
-    val listState = rememberLazyListState()
     val shouldLoadMore by remember {
         derivedStateOf {
             val totalCount = listState.layoutInfo.totalItemsCount

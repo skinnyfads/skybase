@@ -33,6 +33,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -40,6 +42,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.example.skybase.jmnews.JmNewsFragment
 import com.example.skybase.ui.theme.SkyBaseTheme
 import com.example.skybase.ui.theme.ThemeMode
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,6 +61,10 @@ class MainActivity : ComponentActivity() {
             }
             var selectedTab by rememberSaveable { mutableIntStateOf(0) }
             val themeMode = ThemeMode.entries[selectedThemeModeIndex]
+
+            val jmNewsListState = rememberLazyListState()
+            val learningListState = rememberLazyListState()
+            val coroutineScope = rememberCoroutineScope()
 
             SkyBaseTheme(
                 themeMode = themeMode,
@@ -80,7 +87,18 @@ class MainActivity : ComponentActivity() {
                     bottomBar = {
                         BottomNavBar(
                             selectedItem = selectedTab,
-                            onItemSelected = { selectedTab = it }
+                            onItemSelected = { index ->
+                                if (selectedTab == index) {
+                                    coroutineScope.launch {
+                                        when (index) {
+                                            0 -> jmNewsListState.animateScrollToItem(0)
+                                            1 -> learningListState.animateScrollToItem(0)
+                                        }
+                                    }
+                                } else {
+                                    selectedTab = index
+                                }
+                            }
                         )
                     }
                 ) { innerPadding ->
@@ -91,8 +109,8 @@ class MainActivity : ComponentActivity() {
                             .padding(horizontal = 16.dp, vertical = 20.dp)
                     ) {
                         when (selectedTab) {
-                            0 -> JmNewsFragment(modifier = Modifier.fillMaxSize())
-                            1 -> com.example.skybase.learning.LearningFragment(modifier = Modifier.fillMaxSize())
+                            0 -> JmNewsFragment(modifier = Modifier.fillMaxSize(), listState = jmNewsListState)
+                            1 -> com.example.skybase.learning.LearningFragment(modifier = Modifier.fillMaxSize(), listState = learningListState)
                             else -> Text(
                                 text = "Learning Social",
                                 style = MaterialTheme.typography.titleMedium
