@@ -14,6 +14,7 @@ import retrofit2.HttpException
 data class JmNewsUiState(
     val items: List<FeedArticleItem> = emptyList(),
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val hasNextPage: Boolean = true,
     val errorMessage: String? = null,
     val selectedArticleId: String? = null,
@@ -109,6 +110,56 @@ class JmNewsViewModel : ViewModel() {
                 _uiState.update {
                     it.copy(
                         isLoading = false,
+                        errorMessage = "Unable to load feed right now. Please try again."
+                    )
+                }
+            }
+        }
+    }
+
+    fun refreshFeed() {
+        val currentState = _uiState.value
+        if (currentState.isLoading) return
+
+        currentPage = 1
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isLoading = true,
+                    isRefreshing = true,
+                    hasNextPage = true,
+                    errorMessage = null
+                )
+            }
+            try {
+                val response = repository.fetchFeed(
+                    page = currentPage,
+                    limit = PAGE_SIZE
+                )
+                val hasNext = response.pagination?.hasNext ?: (response.items.size >= PAGE_SIZE)
+                _uiState.update {
+                    it.copy(
+                        items = response.items,
+                        isLoading = false,
+                        isRefreshing = false,
+                        hasNextPage = hasNext,
+                        errorMessage = null
+                    )
+                }
+                currentPage += 1
+            } catch (exception: IOException) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        errorMessage = "Unable to load feed. Check your connection and try again."
+                    )
+                }
+            } catch (exception: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
                         errorMessage = "Unable to load feed right now. Please try again."
                     )
                 }
