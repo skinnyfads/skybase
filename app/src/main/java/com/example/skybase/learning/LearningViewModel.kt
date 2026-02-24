@@ -15,6 +15,7 @@ import java.io.IOException
 data class LearningUiState(
     val items: List<FeedPost> = emptyList(),
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val hasNextPage: Boolean = true,
     val errorMessage: String? = null,
     val syncToken: String? = null,
@@ -128,6 +129,66 @@ class LearningViewModel(application: Application) : AndroidViewModel(application
                 _uiState.update {
                     it.copy(
                         isLoading = false,
+                        errorMessage = "Unable to load feed right now. Please try again."
+                    )
+                }
+            }
+        }
+    }
+
+    fun refreshFeed() {
+        val currentState = _uiState.value
+        if (currentState.isLoading) return
+
+        nextCursorBucket = null
+        nextCursorRandomKey = null
+        nextCursorId = null
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isLoading = true,
+                    isRefreshing = true,
+                    hasNextPage = true,
+                    errorMessage = null
+                )
+            }
+            try {
+                val response = repository.fetchPosts(
+                    limit = PAGE_SIZE,
+                    syncToken = currentSyncToken,
+                    cursorBucket = null,
+                    cursorRandomKey = null,
+                    cursorId = null
+                )
+
+                val cursor = response.nextCursor
+                nextCursorBucket = cursor?.bucket
+                nextCursorRandomKey = cursor?.randomKey
+                nextCursorId = cursor?.id
+
+                _uiState.update {
+                    it.copy(
+                        items = response.items,
+                        isLoading = false,
+                        isRefreshing = false,
+                        hasNextPage = cursor != null,
+                        errorMessage = null
+                    )
+                }
+            } catch (exception: IOException) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        errorMessage = "Unable to load feed. Check your connection and try again."
+                    )
+                }
+            } catch (exception: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
                         errorMessage = "Unable to load feed right now. Please try again."
                     )
                 }

@@ -22,12 +22,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -46,6 +48,7 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LearningFragment(
     modifier: Modifier = Modifier,
@@ -130,65 +133,71 @@ fun LearningFragment(
                 return@Box
             }
 
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                state = listState,
-                contentPadding = PaddingValues(vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+            PullToRefreshBox(
+                isRefreshing = uiState.isRefreshing,
+                onRefresh = viewModel::refreshFeed,
+                modifier = Modifier.fillMaxSize()
             ) {
-                items(
-                    count = uiState.items.size,
-                    key = { index ->
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    state = listState,
+                    contentPadding = PaddingValues(vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(
+                        count = uiState.items.size,
+                        key = { index ->
+                            val post = uiState.items[index]
+                            post.id ?: "post-$index"
+                        }
+                    ) { index ->
                         val post = uiState.items[index]
-                        post.id ?: "post-$index"
-                    }
-                ) { index ->
-                    val post = uiState.items[index]
 
-                    val postId = post.id
-                    if (postId != null) {
-                        LaunchedEffect(postId) {
-                            viewModel.markPostAsSeen(postId)
+                        val postId = post.id
+                        if (postId != null) {
+                            LaunchedEffect(postId) {
+                                viewModel.markPostAsSeen(postId)
+                            }
+                        }
+
+                        PostCard(post = post)
+                    }
+
+                    if (uiState.isLoading && uiState.items.isNotEmpty() && !uiState.isRefreshing) {
+                        item(key = "loading") {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator()
+                            }
                         }
                     }
 
-                    PostCard(post = post)
-                }
-
-                if (uiState.isLoading && uiState.items.isNotEmpty()) {
-                    item(key = "loading") {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator()
+                    val errorMessage = uiState.errorMessage
+                    if (errorMessage != null && uiState.items.isNotEmpty()) {
+                        item(key = "error") {
+                            ErrorContent(
+                                message = errorMessage,
+                                onRetry = viewModel::loadNextPage
+                            )
                         }
                     }
-                }
 
-                val errorMessage = uiState.errorMessage
-                if (errorMessage != null && uiState.items.isNotEmpty()) {
-                    item(key = "error") {
-                        ErrorContent(
-                            message = errorMessage,
-                            onRetry = viewModel::loadNextPage
-                        )
-                    }
-                }
-
-                if (!uiState.hasNextPage && uiState.items.isNotEmpty()) {
-                    item(key = "end") {
-                        Text(
-                            text = "You've reached the end",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 20.dp),
-                            textAlign = TextAlign.Center,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    if (!uiState.hasNextPage && uiState.items.isNotEmpty()) {
+                        item(key = "end") {
+                            Text(
+                                text = "You've reached the end",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 20.dp),
+                                textAlign = TextAlign.Center,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
