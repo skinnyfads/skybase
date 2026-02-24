@@ -1,6 +1,7 @@
 package com.example.skybase.jmnews
 
 import android.text.format.DateUtils
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
@@ -45,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -59,6 +61,18 @@ fun JmNewsFragment(
     listState: LazyListState = rememberLazyListState()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+
+    LaunchedEffect(uiState.addVocabularySuccess, uiState.addVocabularyError) {
+        if (uiState.addVocabularySuccess) {
+            Toast.makeText(context, "Added to vocabulary", Toast.LENGTH_SHORT).show()
+            viewModel.resetAddVocabularyState()
+        }
+        uiState.addVocabularyError?.let { errorMsg ->
+            Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
+            viewModel.resetAddVocabularyState()
+        }
+    }
 
     val selectedArticleId = uiState.selectedArticleId
     if (selectedArticleId != null) {
@@ -66,7 +80,8 @@ fun JmNewsFragment(
             modifier = modifier,
             uiState = uiState,
             onBack = viewModel::closeArticle,
-            onRetry = viewModel::retryLoadArticle
+            onRetry = viewModel::retryLoadArticle,
+            onAddVocabulary = viewModel::addVocabulary
         )
         return
     }
@@ -148,7 +163,8 @@ private fun JmNewsArticleDetail(
     modifier: Modifier,
     uiState: JmNewsUiState,
     onBack: () -> Unit,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    onAddVocabulary: (String) -> Unit
 ) {
     val article = uiState.articleDetail
     val articleErrorMessage = uiState.articleErrorMessage
@@ -198,7 +214,11 @@ private fun JmNewsArticleDetail(
             article != null -> {
                 item(key = "article-content") {
                     ArticleTokenContent(
-                        tokens = article.tokens
+                        tokens = article.tokens,
+                        isAddingVocabulary = uiState.isAddingVocabulary,
+                        addingVocabularyKey = uiState.addingVocabularyKey,
+                        addedVocabularyKeys = uiState.addedVocabularyKeys,
+                        onAddVocabulary = onAddVocabulary
                     )
                 }
             }
@@ -217,7 +237,13 @@ private fun JmNewsArticleDetail(
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
-private fun ArticleTokenContent(tokens: List<ArticleToken>) {
+private fun ArticleTokenContent(
+    tokens: List<ArticleToken>,
+    isAddingVocabulary: Boolean,
+    addingVocabularyKey: String?,
+    addedVocabularyKeys: Set<String>,
+    onAddVocabulary: (String) -> Unit
+) {
     var selectedTokenIndex by remember(tokens) { mutableIntStateOf(-1) }
 
     if (tokens.isEmpty()) {
@@ -261,7 +287,13 @@ private fun ArticleTokenContent(tokens: List<ArticleToken>) {
                         onDismissRequest = { selectedTokenIndex = -1 },
                         modifier = Modifier.widthIn(max = 260.dp)
                     ) {
-                        TokenInfoMenu(token = token)
+                        TokenInfoMenu(
+                            token = token,
+                            isAddingVocabulary = isAddingVocabulary,
+                            addingVocabularyKey = addingVocabularyKey,
+                            addedVocabularyKeys = addedVocabularyKeys,
+                            onAddVocabulary = onAddVocabulary
+                        )
                     }
                 }
             }
@@ -271,72 +303,106 @@ private fun ArticleTokenContent(tokens: List<ArticleToken>) {
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
-private fun TokenInfoMenu(token: ArticleToken) {
+private fun TokenInfoMenu(
+    token: ArticleToken,
+    isAddingVocabulary: Boolean,
+    addingVocabularyKey: String?,
+    addedVocabularyKeys: Set<String>,
+    onAddVocabulary: (String) -> Unit
+) {
     val reading = token.reading?.takeIf { it.isNotBlank() }
     val dictForm = token.dictForm?.takeIf { it.isNotBlank() }
+    val dictKey = dictForm ?: reading
+    val isAdded = dictKey != null && addedVocabularyKeys.contains(dictKey)
+    val isAddingThisKey = dictKey != null && isAddingVocabulary && addingVocabularyKey == dictKey
+    val buttonEnabled = dictKey != null && !isAdded && !isAddingThisKey
+    val buttonText = when {
+        dictKey == null -> "Unavailable"
+        isAdded -> "Added to Vocabularies"
+        isAddingThisKey -> "Adding..."
+        else -> "Add to Vocabulary"
+    }
     val posList = token.pos?.filter { it.isNotBlank() }.orEmpty()
     val meanings = token.meanings?.filter { it.isNotBlank() }.orEmpty()
 
     Column(
         modifier = Modifier
             .padding(horizontal = 16.dp, vertical = 12.dp)
-            .heightIn(max = 240.dp)
-            .verticalScroll(rememberScrollState()),
+            .heightIn(max = 280.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Top row: reading (left) + base word (right)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Bottom
+        Column(
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = reading ?: dictForm ?: "-",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-            if (dictForm != null && reading != null) {
-                Text(
-                    text = dictForm,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        HorizontalDivider()
-
-        // POS tags as chips
-        if (posList.isNotEmpty()) {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+            // Top row: reading (left) + base word (right)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
             ) {
-                posList.forEach { tag ->
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant
-                    ) {
+                Text(
+                    text = reading ?: dictForm ?: "-",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                if (dictForm != null && reading != null) {
+                    Text(
+                        text = dictForm,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            HorizontalDivider()
+
+            // POS tags as chips
+            if (posList.isNotEmpty()) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    posList.forEach { tag ->
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Text(
+                                text = tag,
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Numbered meanings
+            if (meanings.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    meanings.forEachIndexed { i, meaning ->
                         Text(
-                            text = tag,
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            text = "${i + 1}. $meaning",
+                            style = MaterialTheme.typography.bodyMedium
                         )
                     }
                 }
             }
         }
 
-        // Numbered meanings
-        if (meanings.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                meanings.forEachIndexed { i, meaning ->
-                    Text(
-                        text = "${i + 1}. $meaning",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+        Button(
+            onClick = {
+                if (dictKey != null) {
+                    onAddVocabulary(dictKey)
                 }
-            }
+            },
+            enabled = buttonEnabled,
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+        ) {
+            Text(text = buttonText)
         }
     }
 }

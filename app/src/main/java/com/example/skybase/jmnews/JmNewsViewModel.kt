@@ -8,6 +8,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.IOException
+import com.example.skybase.vocabulary.VocabularyRepository
+import retrofit2.HttpException
 
 data class JmNewsUiState(
     val items: List<FeedArticleItem> = emptyList(),
@@ -17,11 +19,17 @@ data class JmNewsUiState(
     val selectedArticleId: String? = null,
     val articleDetail: ArticleDetailResponse? = null,
     val isLoadingArticle: Boolean = false,
-    val articleErrorMessage: String? = null
+    val articleErrorMessage: String? = null,
+    val isAddingVocabulary: Boolean = false,
+    val addingVocabularyKey: String? = null,
+    val addedVocabularyKeys: Set<String> = emptySet(),
+    val addVocabularyError: String? = null,
+    val addVocabularySuccess: Boolean = false
 )
 
 class JmNewsViewModel : ViewModel() {
     private val repository = JmNewsRepository(JmNewsApiClient.service)
+    private val vocabularyRepository = VocabularyRepository()
     private val _uiState = MutableStateFlow(JmNewsUiState())
     val uiState: StateFlow<JmNewsUiState> = _uiState.asStateFlow()
 
@@ -133,6 +141,57 @@ class JmNewsViewModel : ViewModel() {
                 }
             }
         }
+    }
+
+    fun addVocabulary(dictKey: String) {
+        if (dictKey.isBlank()) return
+        if (_uiState.value.addedVocabularyKeys.contains(dictKey)) return
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isAddingVocabulary = true,
+                    addingVocabularyKey = dictKey,
+                    addVocabularyError = null,
+                    addVocabularySuccess = false
+                )
+            }
+            try {
+                vocabularyRepository.addVocabulary(dictKey = dictKey)
+                _uiState.update {
+                    it.copy(
+                        isAddingVocabulary = false,
+                        addingVocabularyKey = null,
+                        addedVocabularyKeys = it.addedVocabularyKeys + dictKey,
+                        addVocabularySuccess = true
+                    )
+                }
+            } catch (exception: HttpException) {
+                val message = if (exception.code() == 400) {
+                    "Cannot add vocabulary: dictKey must match a JMDict headword or reading."
+                } else {
+                    "Failed to add vocabulary. Please try again."
+                }
+                _uiState.update {
+                    it.copy(
+                        isAddingVocabulary = false,
+                        addingVocabularyKey = null,
+                        addVocabularyError = message
+                    )
+                }
+            } catch (exception: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isAddingVocabulary = false,
+                        addingVocabularyKey = null,
+                        addVocabularyError = "Failed to add vocabulary. Please try again."
+                    )
+                }
+            }
+        }
+    }
+
+    fun resetAddVocabularyState() {
+        _uiState.update { it.copy(addVocabularySuccess = false, addVocabularyError = null) }
     }
 
     companion object {
