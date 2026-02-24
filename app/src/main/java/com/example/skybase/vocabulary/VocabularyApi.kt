@@ -3,7 +3,9 @@ package com.example.skybase.vocabulary
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
+import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Query
 
 data class AddVocabularyRequest(
     val dictKey: String
@@ -21,7 +23,20 @@ data class AddVocabularyResponse(
     val reason: String? = null
 )
 
+data class ListVocabulariesResponse(
+    val items: List<AddVocabularyResponse> = emptyList(),
+    val total: Int = 0,
+    val page: Int = 1,
+    val limit: Int = 20
+)
+
 interface VocabularyApi {
+    @GET("vocabularies")
+    suspend fun listVocabularies(
+        @Query("page") page: Int,
+        @Query("limit") limit: Int
+    ): ListVocabulariesResponse
+
     @POST("vocabularies")
     suspend fun addVocabulary(
         @Body request: AddVocabularyRequest

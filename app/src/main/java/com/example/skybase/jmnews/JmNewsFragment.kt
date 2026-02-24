@@ -215,6 +215,7 @@ private fun JmNewsArticleDetail(
                 item(key = "article-content") {
                     ArticleTokenContent(
                         tokens = article.tokens,
+                        isLoadingVocabularies = uiState.isLoadingVocabularies,
                         isAddingVocabulary = uiState.isAddingVocabulary,
                         addingVocabularyKey = uiState.addingVocabularyKey,
                         addedVocabularyKeys = uiState.addedVocabularyKeys,
@@ -239,6 +240,7 @@ private fun JmNewsArticleDetail(
 @OptIn(ExperimentalLayoutApi::class)
 private fun ArticleTokenContent(
     tokens: List<ArticleToken>,
+    isLoadingVocabularies: Boolean,
     isAddingVocabulary: Boolean,
     addingVocabularyKey: String?,
     addedVocabularyKeys: Set<String>,
@@ -289,6 +291,7 @@ private fun ArticleTokenContent(
                     ) {
                         TokenInfoMenu(
                             token = token,
+                            isLoadingVocabularies = isLoadingVocabularies,
                             isAddingVocabulary = isAddingVocabulary,
                             addingVocabularyKey = addingVocabularyKey,
                             addedVocabularyKeys = addedVocabularyKeys,
@@ -305,6 +308,7 @@ private fun ArticleTokenContent(
 @OptIn(ExperimentalLayoutApi::class)
 private fun TokenInfoMenu(
     token: ArticleToken,
+    isLoadingVocabularies: Boolean,
     isAddingVocabulary: Boolean,
     addingVocabularyKey: String?,
     addedVocabularyKeys: Set<String>,
@@ -315,10 +319,11 @@ private fun TokenInfoMenu(
     val dictKey = dictForm ?: reading
     val isAdded = dictKey != null && addedVocabularyKeys.contains(dictKey)
     val isAddingThisKey = dictKey != null && isAddingVocabulary && addingVocabularyKey == dictKey
-    val buttonEnabled = dictKey != null && !isAdded && !isAddingThisKey
+    val buttonEnabled = dictKey != null && !isLoadingVocabularies && !isAdded && !isAddingThisKey
     val buttonText = when {
         dictKey == null -> "Unavailable"
-        isAdded -> "Added to Vocabularies"
+        isLoadingVocabularies -> "Checking vocabularies..."
+        isAdded -> "Vocabulary already added"
         isAddingThisKey -> "Adding..."
         else -> "Add to Vocabulary"
     }

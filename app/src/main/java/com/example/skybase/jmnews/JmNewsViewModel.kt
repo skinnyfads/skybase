@@ -20,6 +20,7 @@ data class JmNewsUiState(
     val articleDetail: ArticleDetailResponse? = null,
     val isLoadingArticle: Boolean = false,
     val articleErrorMessage: String? = null,
+    val isLoadingVocabularies: Boolean = false,
     val isAddingVocabulary: Boolean = false,
     val addingVocabularyKey: String? = null,
     val addedVocabularyKeys: Set<String> = emptySet(),
@@ -36,6 +37,7 @@ class JmNewsViewModel : ViewModel() {
     private var currentPage = 1
 
     init {
+        loadExistingVocabularies()
         loadNextPage()
     }
 
@@ -139,6 +141,23 @@ class JmNewsViewModel : ViewModel() {
                         articleErrorMessage = "Unable to load article right now. Please try again."
                     )
                 }
+            }
+        }
+    }
+
+    private fun loadExistingVocabularies() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingVocabularies = true) }
+            try {
+                val existingDictKeys = vocabularyRepository.fetchAllVocabularyDictKeys(limit = PAGE_SIZE)
+                _uiState.update {
+                    it.copy(
+                        isLoadingVocabularies = false,
+                        addedVocabularyKeys = it.addedVocabularyKeys + existingDictKeys
+                    )
+                }
+            } catch (_: Exception) {
+                _uiState.update { it.copy(isLoadingVocabularies = false) }
             }
         }
     }
