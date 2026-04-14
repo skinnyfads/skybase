@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.navigationBars
@@ -23,10 +24,12 @@ import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +50,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import com.example.skybase.jm.JmFragment
+import com.example.skybase.jm.JmSubmenu
 import com.example.skybase.jmnews.JmNewsFragment
 import com.example.skybase.ui.theme.SkyBaseTheme
 import com.example.skybase.ui.theme.ThemeMode
@@ -68,7 +73,9 @@ class MainActivity : ComponentActivity() {
                 mutableIntStateOf(savedThemeModeIndex)
             }
             var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+            var selectedJmSubmenuIndex by rememberSaveable { mutableIntStateOf(0) }
             val themeMode = ThemeMode.entries[selectedThemeModeIndex]
+            val selectedJmSubmenu = JmSubmenu.entries[selectedJmSubmenuIndex]
 
             val jmNewsListState = rememberLazyListState()
             val learningListState = rememberLazyListState()
@@ -83,12 +90,17 @@ class MainActivity : ComponentActivity() {
                     topBar = {
                         ThemeMenuBar(
                             selectedMode = themeMode,
+                            selectedTab = selectedTab,
+                            selectedJmSubmenu = selectedJmSubmenu,
                             onModeSelected = { mode ->
                                 val modeIndex = mode.ordinal
                                 selectedThemeModeIndex = modeIndex
                                 preferences.edit()
                                     .putInt(THEME_MODE_INDEX_KEY, modeIndex)
                                     .apply()
+                            },
+                            onJmSubmenuSelected = { submenu ->
+                                selectedJmSubmenuIndex = submenu.ordinal
                             }
                         )
                     },
@@ -101,6 +113,7 @@ class MainActivity : ComponentActivity() {
                                         when (index) {
                                             0 -> jmNewsListState.animateScrollToItem(0)
                                             1 -> learningListState.animateScrollToItem(0)
+                                            2 -> Unit
                                         }
                                     }
                                 } else {
@@ -119,8 +132,9 @@ class MainActivity : ComponentActivity() {
                         when (selectedTab) {
                             0 -> JmNewsFragment(modifier = Modifier.fillMaxSize(), listState = jmNewsListState)
                             1 -> com.example.skybase.learning.LearningFragment(modifier = Modifier.fillMaxSize(), listState = learningListState)
+                            2 -> JmFragment(modifier = Modifier.fillMaxSize(), selectedSubmenu = selectedJmSubmenu)
                             else -> Text(
-                                text = "Learning Social",
+                                text = "JM",
                                 style = MaterialTheme.typography.titleMedium
                             )
                         }
@@ -139,7 +153,10 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun ThemeMenuBar(
     selectedMode: ThemeMode,
-    onModeSelected: (ThemeMode) -> Unit
+    selectedTab: Int,
+    selectedJmSubmenu: JmSubmenu,
+    onModeSelected: (ThemeMode) -> Unit,
+    onJmSubmenuSelected: (JmSubmenu) -> Unit
 ) {
     var showMenu by rememberSaveable { mutableStateOf(false) }
 
@@ -157,15 +174,41 @@ fun ThemeMenuBar(
                 .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "SkyBase",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 12.dp)
-            )
+            if (selectedTab == 2) {
+                Box(modifier = Modifier.width(48.dp))
 
-            Box {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(
+                        space = 8.dp,
+                        alignment = Alignment.CenterHorizontally
+                    ),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    JmSubmenu.entries.forEach { submenu ->
+                        FilterChip(
+                            selected = selectedJmSubmenu == submenu,
+                            onClick = { onJmSubmenuSelected(submenu) },
+                            label = { Text(text = submenu.label) }
+                        )
+                    }
+                }
+            } else {
+                Text(
+                    text = "SkyBase",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 12.dp)
+                )
+            }
+
+            Box(
+                modifier = Modifier.width(48.dp),
+                contentAlignment = Alignment.Center
+            ) {
                 IconButton(onClick = { showMenu = true }) {
                     Icon(
                         imageVector = Icons.Filled.MoreVert,
@@ -246,7 +289,8 @@ fun BottomNavBar(
 ) {
     val items = listOf(
         Icons.Filled.Article to "JM News",
-        Icons.Filled.School to "Learning Social"
+        Icons.Filled.School to "Learning Social",
+        Icons.Filled.MenuBook to "JM"
     )
 
     val bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
