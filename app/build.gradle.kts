@@ -23,6 +23,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "JM_NEWS_BASE_URL", properties.getProperty("JM_NEWS_BASE_URL") ?: "\"\"")
         buildConfigField("String", "LEARNING_BASE_URL", properties.getProperty("LEARNING_BASE_URL") ?: "\"\"")
+        buildConfigField("String", "JM_BASE_URL", properties.getProperty("JM_BASE_URL") ?: "\"\"")
     }
 
     buildTypes {
