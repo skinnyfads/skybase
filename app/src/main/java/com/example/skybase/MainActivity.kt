@@ -67,13 +67,19 @@ class MainActivity : ComponentActivity() {
         val savedThemeModeIndex = preferences
             .getInt(THEME_MODE_INDEX_KEY, ThemeMode.DARK.ordinal)
             .coerceIn(0, ThemeMode.entries.lastIndex)
+        val savedTabIndex = preferences
+            .getInt(LAST_TAB_INDEX_KEY, 0)
+            .coerceIn(0, 2)
+        val savedJmSubmenuIndex = preferences
+            .getInt(LAST_JM_SUBMENU_INDEX_KEY, 0)
+            .coerceIn(0, JmSubmenu.entries.lastIndex)
 
         setContent {
             var selectedThemeModeIndex by rememberSaveable {
                 mutableIntStateOf(savedThemeModeIndex)
             }
-            var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-            var selectedJmSubmenuIndex by rememberSaveable { mutableIntStateOf(0) }
+            var selectedTab by rememberSaveable { mutableIntStateOf(savedTabIndex) }
+            var selectedJmSubmenuIndex by rememberSaveable { mutableIntStateOf(savedJmSubmenuIndex) }
             val themeMode = ThemeMode.entries[selectedThemeModeIndex]
             val selectedJmSubmenu = JmSubmenu.entries[selectedJmSubmenuIndex]
 
@@ -100,7 +106,11 @@ class MainActivity : ComponentActivity() {
                                     .apply()
                             },
                             onJmSubmenuSelected = { submenu ->
-                                selectedJmSubmenuIndex = submenu.ordinal
+                                val submenuIndex = submenu.ordinal
+                                selectedJmSubmenuIndex = submenuIndex
+                                preferences.edit()
+                                    .putInt(LAST_JM_SUBMENU_INDEX_KEY, submenuIndex)
+                                    .apply()
                             }
                         )
                     },
@@ -118,6 +128,9 @@ class MainActivity : ComponentActivity() {
                                     }
                                 } else {
                                     selectedTab = index
+                                    preferences.edit()
+                                        .putInt(LAST_TAB_INDEX_KEY, index)
+                                        .apply()
                                 }
                             }
                         )
@@ -147,6 +160,8 @@ class MainActivity : ComponentActivity() {
     private companion object {
         const val THEME_PREFS_NAME = "skybase_theme_prefs"
         const val THEME_MODE_INDEX_KEY = "theme_mode_index"
+        const val LAST_TAB_INDEX_KEY = "last_tab_index"
+        const val LAST_JM_SUBMENU_INDEX_KEY = "last_jm_submenu_index"
     }
 }
 
