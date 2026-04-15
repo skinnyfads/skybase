@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.update
 data class JmSettingsUiState(
     val languages: List<JmLanguage> = emptyList(),
     val levels: List<JmDifficultyLevel> = emptyList(),
+    val loadedLevelsLanguage: String? = null,
     val isLoadingLanguages: Boolean = false,
     val isLoadingLevels: Boolean = false,
     val errorMessage: String? = null
@@ -86,7 +87,8 @@ class JmSettingsViewModel : ViewModel() {
                 _uiState.update {
                     it.copy(
                         isLoadingLevels = false,
-                        levels = levels
+                        levels = levels,
+                        loadedLevelsLanguage = normalizedLanguage
                     )
                 }
             } catch (_: Exception) {
@@ -94,6 +96,7 @@ class JmSettingsViewModel : ViewModel() {
                     it.copy(
                         isLoadingLevels = false,
                         levels = emptyList(),
+                        loadedLevelsLanguage = normalizedLanguage,
                         errorMessage = "Failed to load settings options."
                     )
                 }
@@ -106,6 +109,7 @@ class JmSettingsViewModel : ViewModel() {
         _uiState.update {
             it.copy(
                 levels = emptyList(),
+                loadedLevelsLanguage = null,
                 isLoadingLevels = false
             )
         }

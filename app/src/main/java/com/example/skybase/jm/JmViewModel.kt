@@ -2,6 +2,8 @@ package com.example.skybase.jm
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,6 +37,7 @@ class JmViewModel : ViewModel() {
     private var currentPage = 1
     private var currentLanguageFilter: String? = null
     private var currentLevelFilter: String? = null
+    private var feedJob: Job? = null
 
     init {
         loadNextPage()
@@ -91,7 +94,7 @@ class JmViewModel : ViewModel() {
         val currentState = _uiState.value
         if (currentState.isLoading || !currentState.hasNextPage) return
 
-        viewModelScope.launch {
+        feedJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             try {
                 val response = repository.fetchFeed(
@@ -113,6 +116,8 @@ class JmViewModel : ViewModel() {
                     )
                 }
                 currentPage = pageValue + 1
+            } catch (exception: CancellationException) {
+                throw exception
             } catch (exception: IOException) {
                 _uiState.update {
                     it.copy(
@@ -136,7 +141,7 @@ class JmViewModel : ViewModel() {
         if (currentState.isLoading) return
 
         currentPage = 1
-        viewModelScope.launch {
+        feedJob = viewModelScope.launch {
             _uiState.update {
                 it.copy(
                     isLoading = true,
@@ -166,6 +171,8 @@ class JmViewModel : ViewModel() {
                     )
                 }
                 currentPage = pageValue + 1
+            } catch (exception: CancellationException) {
+                throw exception
             } catch (exception: IOException) {
                 _uiState.update {
                     it.copy(
@@ -288,10 +295,10 @@ class JmViewModel : ViewModel() {
     private fun normalizeFilter(value: String): String? = value.trim().takeIf { it.isNotEmpty() }
 
     private fun reloadFeedForFilters() {
-        if (_uiState.value.isLoading) return
+        feedJob?.cancel()
 
         currentPage = 1
-        viewModelScope.launch {
+        feedJob = viewModelScope.launch {
             _uiState.update {
                 it.copy(
                     items = emptyList(),
@@ -324,6 +331,8 @@ class JmViewModel : ViewModel() {
                     )
                 }
                 currentPage = pageValue + 1
+            } catch (exception: CancellationException) {
+                throw exception
             } catch (exception: IOException) {
                 _uiState.update {
                     it.copy(

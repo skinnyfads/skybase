@@ -53,8 +53,16 @@ fun JmSettingsFragment(
         }
     }
 
-    LaunchedEffect(selectedLanguage, selectedLevel, uiState.levels) {
+    LaunchedEffect(
+        selectedLanguage,
+        selectedLevel,
+        uiState.levels,
+        uiState.loadedLevelsLanguage,
+        uiState.isLoadingLevels
+    ) {
         if (selectedLanguage.isBlank() || selectedLevel.isBlank()) return@LaunchedEffect
+        if (uiState.isLoadingLevels) return@LaunchedEffect
+        if (uiState.loadedLevelsLanguage != selectedLanguage) return@LaunchedEffect
         if (uiState.levels.none { it.name == selectedLevel }) {
             onLevelChange("")
         }
