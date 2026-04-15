@@ -38,6 +38,7 @@ class JmViewModel : ViewModel() {
     private var currentLanguageFilter: String? = null
     private var currentLevelFilter: String? = null
     private var feedJob: Job? = null
+    private var pendingOpenNextAfterPageLoad = false
 
     init {
         loadNextPage()
@@ -90,6 +91,14 @@ class JmViewModel : ViewModel() {
         loadArticle(articleId)
     }
 
+    fun openNextArticle() {
+        openAdjacentArticle(offset = 1)
+    }
+
+    fun openPreviousArticle() {
+        openAdjacentArticle(offset = -1)
+    }
+
     fun loadNextPage() {
         val currentState = _uiState.value
         if (currentState.isLoading || !currentState.hasNextPage) return
@@ -116,9 +125,14 @@ class JmViewModel : ViewModel() {
                     )
                 }
                 currentPage = pageValue + 1
+                if (pendingOpenNextAfterPageLoad) {
+                    pendingOpenNextAfterPageLoad = false
+                    openAdjacentArticle(offset = 1)
+                }
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: IOException) {
+                pendingOpenNextAfterPageLoad = false
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -126,6 +140,7 @@ class JmViewModel : ViewModel() {
                     )
                 }
             } catch (exception: Exception) {
+                pendingOpenNextAfterPageLoad = false
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -140,6 +155,7 @@ class JmViewModel : ViewModel() {
         val currentState = _uiState.value
         if (currentState.isLoading) return
 
+        pendingOpenNextAfterPageLoad = false
         currentPage = 1
         feedJob = viewModelScope.launch {
             _uiState.update {
@@ -174,6 +190,7 @@ class JmViewModel : ViewModel() {
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: IOException) {
+                pendingOpenNextAfterPageLoad = false
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -182,6 +199,7 @@ class JmViewModel : ViewModel() {
                     )
                 }
             } catch (exception: Exception) {
+                pendingOpenNextAfterPageLoad = false
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -292,10 +310,33 @@ class JmViewModel : ViewModel() {
         return "${language.trim().lowercase()}::${word.trim()}"
     }
 
+    private fun openAdjacentArticle(offset: Int) {
+        val state = _uiState.value
+        if (state.isLoadingArticle) return
+        val selectedId = state.selectedArticleId ?: return
+        val currentIndex = state.items.indexOfFirst { it.id == selectedId }
+        if (currentIndex < 0) return
+
+        val targetIndex = currentIndex + offset
+        if (targetIndex !in state.items.indices) {
+            if (offset > 0 && state.hasNextPage && !state.isLoading) {
+                pendingOpenNextAfterPageLoad = true
+                loadNextPage()
+            } else {
+                pendingOpenNextAfterPageLoad = false
+            }
+            return
+        }
+
+        val targetId = state.items[targetIndex].id?.takeIf { it.isNotBlank() } ?: return
+        openArticle(targetId)
+    }
+
     private fun normalizeFilter(value: String): String? = value.trim().takeIf { it.isNotEmpty() }
 
     private fun reloadFeedForFilters() {
         feedJob?.cancel()
+        pendingOpenNextAfterPageLoad = false
 
         currentPage = 1
         feedJob = viewModelScope.launch {
@@ -331,9 +372,14 @@ class JmViewModel : ViewModel() {
                     )
                 }
                 currentPage = pageValue + 1
+                if (pendingOpenNextAfterPageLoad) {
+                    pendingOpenNextAfterPageLoad = false
+                    openAdjacentArticle(offset = 1)
+                }
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: IOException) {
+                pendingOpenNextAfterPageLoad = false
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -342,6 +388,7 @@ class JmViewModel : ViewModel() {
                     )
                 }
             } catch (exception: Exception) {
+                pendingOpenNextAfterPageLoad = false
                 _uiState.update {
                     it.copy(
                         isLoading = false,

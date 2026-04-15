@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -38,16 +40,21 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlin.math.abs
+import kotlin.math.roundToInt
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
@@ -89,7 +96,9 @@ fun JmFeedFragment(
             uiState = uiState,
             onBack = viewModel::closeArticle,
             onRetry = viewModel::retryLoadArticle,
-            onAddVocabulary = viewModel::addVocabulary
+            onAddVocabulary = viewModel::addVocabulary,
+            onOpenPreviousArticle = viewModel::openPreviousArticle,
+            onOpenNextArticle = viewModel::openNextArticle
         )
         return
     }
@@ -178,21 +187,68 @@ private fun JmArticleDetail(
     uiState: JmUiState,
     onBack: () -> Unit,
     onRetry: () -> Unit,
-    onAddVocabulary: (String, String) -> Unit
+    onAddVocabulary: (String, String) -> Unit,
+    onOpenPreviousArticle: () -> Unit,
+    onOpenNextArticle: () -> Unit
 ) {
     val article = uiState.articleDetail
     val articleErrorMessage = uiState.articleErrorMessage
+    var dragOffsetY by remember(uiState.selectedArticleId) { mutableFloatStateOf(0f) }
+    val currentIndex = uiState.items.indexOfFirst { it.id == uiState.selectedArticleId }
+    val canOpenPrevious = currentIndex > 0
+    val canOpenNext = currentIndex >= 0 && (currentIndex < uiState.items.lastIndex || uiState.hasNextPage)
+    val swipeDirection = when {
+        dragOffsetY >= SWIPE_INDICATOR_MIN_OFFSET && canOpenPrevious -> SwipeArticleDirection.PREVIOUS
+        dragOffsetY <= -SWIPE_INDICATOR_MIN_OFFSET && canOpenNext -> SwipeArticleDirection.NEXT
+        else -> SwipeArticleDirection.NONE
+    }
+    val canReleaseToSwitch = abs(dragOffsetY) >= SWIPE_ARTICLE_THRESHOLD
 
     BackHandler(onBack = onBack)
 
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    LaunchedEffect(uiState.selectedArticleId) {
+        dragOffsetY = 0f
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .pointerInput(uiState.selectedArticleId, uiState.isLoadingArticle, canOpenNext, canOpenPrevious) {
+                detectVerticalDragGestures(
+                    onDragEnd = {
+                        if (!uiState.isLoadingArticle) {
+                            when {
+                                dragOffsetY <= -SWIPE_ARTICLE_THRESHOLD && canOpenNext -> {
+                                    onOpenNextArticle()
+                                }
+                                dragOffsetY >= SWIPE_ARTICLE_THRESHOLD && canOpenPrevious -> {
+                                    onOpenPreviousArticle()
+                                }
+                            }
+                        }
+                        dragOffsetY = 0f
+                    },
+                    onDragCancel = {
+                        dragOffsetY = 0f
+                    }
+                ) { change, dragAmount ->
+                    val nextOffset = (dragOffsetY + dragAmount).coerceIn(-SWIPE_MAX_DRAG, SWIPE_MAX_DRAG)
+                    dragOffsetY = when {
+                        nextOffset > 0f && !canOpenPrevious -> 0f
+                        nextOffset < 0f && !canOpenNext -> 0f
+                        else -> nextOffset
+                    }
+                    change.consume()
+                }
+            }
     ) {
-        when {
-            uiState.isLoadingArticle -> {
-                item(key = "loading-article") {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .offset { IntOffset(0, dragOffsetY.roundToInt()) }
+        ) {
+            when {
+                uiState.isLoadingArticle -> {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -202,33 +258,80 @@ private fun JmArticleDetail(
                         CircularProgressIndicator()
                     }
                 }
-            }
 
-            article != null -> {
-                item(key = "article-content") {
-                    ArticleTokenContent(
-                        tokens = article.tokens,
-                        language = article.language,
-                        isAddingVocabulary = uiState.isAddingVocabulary,
-                        addingVocabularyKey = uiState.addingVocabularyKey,
-                        addedVocabularyKeys = uiState.addedVocabularyKeys,
-                        onAddVocabulary = onAddVocabulary
-                    )
+                article != null -> {
+                    Column(
+                        modifier = Modifier.padding(vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        ArticleTokenContent(
+                            tokens = article.tokens,
+                            language = article.language,
+                            isAddingVocabulary = uiState.isAddingVocabulary,
+                            addingVocabularyKey = uiState.addingVocabularyKey,
+                            addedVocabularyKeys = uiState.addedVocabularyKeys,
+                            onAddVocabulary = onAddVocabulary
+                        )
+                    }
+                }
+
+                articleErrorMessage != null -> {
+                    Column(
+                        modifier = Modifier.padding(vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        ErrorCard(
+                            message = articleErrorMessage,
+                            onRetry = onRetry
+                        )
+                    }
                 }
             }
+        }
 
-            articleErrorMessage != null -> {
-                item(key = "article-error") {
-                    ErrorCard(
-                        message = articleErrorMessage,
-                        onRetry = onRetry
-                    )
+        if (swipeDirection == SwipeArticleDirection.PREVIOUS) {
+            SwipePullIndicator(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 8.dp, start = 12.dp, end = 12.dp)
+                    .fillMaxWidth(),
+                message = if (canReleaseToSwitch) {
+                    "Release to go to previous article"
+                } else {
+                    "Pull down for previous article"
                 }
-            }
+            )
+        }
+        if (swipeDirection == SwipeArticleDirection.NEXT) {
+            SwipePullIndicator(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 8.dp, start = 12.dp, end = 12.dp)
+                    .fillMaxWidth(),
+                message = if (canReleaseToSwitch) {
+                    "Release to go to next article"
+                } else {
+                    "Pull up for next article"
+                }
+            )
         }
     }
 }
 
+@Composable
+private fun SwipePullIndicator(
+    modifier: Modifier = Modifier,
+    message: String
+) {
+    Card(modifier = modifier) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+        )
+    }
+}
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
 private fun ArticleTokenContent(
@@ -522,6 +625,16 @@ private fun parseCreatedAtMillis(rawCreatedAt: String?): Long? {
         }.getOrNull()?.let { return it }
     }
     return null
+}
+
+private const val SWIPE_ARTICLE_THRESHOLD = 72f
+private const val SWIPE_INDICATOR_MIN_OFFSET = 8f
+private const val SWIPE_MAX_DRAG = 240f
+
+private enum class SwipeArticleDirection {
+    NONE,
+    NEXT,
+    PREVIOUS
 }
 
 private fun buildVocabularyKey(word: String, language: String): String {
