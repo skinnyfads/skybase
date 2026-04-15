@@ -3,6 +3,7 @@ package com.example.skybase.jm
 import android.text.format.DateUtils
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -396,6 +398,9 @@ private fun ArticleFeedCard(
     onClick: () -> Unit
 ) {
     val previewText = article.previewText?.takeIf { it.isNotBlank() } ?: ""
+    val languageText = article.language?.takeIf { it.isNotBlank() }
+    val levelText = article.levelLabel?.takeIf { it.isNotBlank() }
+        ?: article.level?.toString()?.takeIf { it.isNotBlank() }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -405,6 +410,26 @@ private fun ArticleFeedCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            if (languageText != null || levelText != null) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    languageText?.let { label ->
+                        ArticleMetaBadge(
+                            text = label,
+                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                            contentColor = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    levelText?.let { label ->
+                        ArticleMetaBadge(
+                            text = label,
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
+            }
             Text(
                 text = previewText,
                 style = MaterialTheme.typography.bodyMedium,
@@ -417,6 +442,25 @@ private fun ArticleFeedCard(
             )
         }
     }
+}
+
+@Composable
+private fun ArticleMetaBadge(
+    text: String,
+    containerColor: Color,
+    contentColor: Color
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = contentColor,
+        modifier = Modifier
+            .background(
+                color = containerColor,
+                shape = RoundedCornerShape(999.dp)
+            )
+            .padding(horizontal = 10.dp, vertical = 4.dp)
+    )
 }
 
 @Composable
