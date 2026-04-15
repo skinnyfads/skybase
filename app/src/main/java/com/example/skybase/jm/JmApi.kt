@@ -7,6 +7,7 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.DELETE
 
 interface JmApi {
     @GET("articles/feed")
@@ -26,6 +27,28 @@ interface JmApi {
     suspend fun addVocabulary(
         @Body request: JmAddVocabularyRequest
     ): JmVocabularyResponseDto
+
+    @GET("vocabs")
+    suspend fun listVocabularies(
+        @Query("page") page: Int,
+        @Query("limit") limit: Int,
+        @Query("language") language: String? = null,
+        @Query("level") level: String? = null,
+        @Query("with_examples") withExamples: Boolean = false
+    ): JmVocabularyListResponseDto
+
+    @GET("vocabs/random")
+    suspend fun randomVocabularies(
+        @Query("limit") limit: Int,
+        @Query("language") language: String? = null,
+        @Query("level") level: String? = null,
+        @Query("with_examples") withExamples: Boolean = false
+    ): JmRandomVocabularyResponseDto
+
+    @DELETE("vocabs/{id}")
+    suspend fun deleteVocabulary(
+        @Path("id") id: String
+    ): JmDeleteVocabularyResponseDto
 }
 
 object JmApiClient {
