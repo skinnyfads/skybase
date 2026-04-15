@@ -2,6 +2,8 @@ package com.example.skybase.jm
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,14 +35,28 @@ class JmFlashcardsViewModel : ViewModel() {
     private val repository = JmRepository(JmApiClient.service)
     private val _uiState = MutableStateFlow(JmFlashcardsUiState())
     val uiState: StateFlow<JmFlashcardsUiState> = _uiState.asStateFlow()
+    private var currentLanguageFilter: String? = null
+    private var currentLevelFilter: String? = null
+    private var fetchJob: Job? = null
 
     init {
         fetchNewBatch()
     }
 
+    fun applyFilters(language: String, level: String) {
+        val normalizedLanguage = normalizeFilter(language)
+        val normalizedLevel = normalizeFilter(level)
+        val nextLevel = if (normalizedLanguage == null) null else normalizedLevel
+        if (currentLanguageFilter == normalizedLanguage && currentLevelFilter == nextLevel) return
+
+        currentLanguageFilter = normalizedLanguage
+        currentLevelFilter = nextLevel
+        fetchNewBatch()
+    }
+
     fun fetchNewBatch() {
-        if (_uiState.value.isLoadingDeck) return
-        viewModelScope.launch {
+        fetchJob?.cancel()
+        fetchJob = viewModelScope.launch {
             _uiState.update {
                 it.copy(
                     isLoadingDeck = true,
@@ -51,6 +67,8 @@ class JmFlashcardsViewModel : ViewModel() {
             try {
                 val randomDeck = repository.fetchRandomVocabularies(
                     limit = RANDOM_DECK_LIMIT,
+                    language = currentLanguageFilter,
+                    level = currentLevelFilter,
                     withExamples = true
                 ).shuffled()
                 _uiState.update {
@@ -66,6 +84,8 @@ class JmFlashcardsViewModel : ViewModel() {
                         vocabularyActionError = null
                     )
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: Exception) {
                 _uiState.update {
                     it.copy(
@@ -239,4 +259,6 @@ class JmFlashcardsViewModel : ViewModel() {
     private companion object {
         const val RANDOM_DECK_LIMIT = 10
     }
+
+    private fun normalizeFilter(value: String): String? = value.trim().takeIf { it.isNotEmpty() }
 }

@@ -54,11 +54,20 @@ import java.util.TimeZone
 @Composable
 fun JmFeedFragment(
     modifier: Modifier = Modifier,
+    languageFilter: String = "",
+    levelFilter: String = "",
     viewModel: JmViewModel = viewModel(),
     listState: LazyListState = rememberLazyListState()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+
+    LaunchedEffect(languageFilter, levelFilter) {
+        viewModel.applyFilters(
+            language = languageFilter,
+            level = levelFilter
+        )
+    }
 
     LaunchedEffect(uiState.addVocabularySuccess, uiState.addVocabularyError) {
         if (uiState.addVocabularySuccess) {

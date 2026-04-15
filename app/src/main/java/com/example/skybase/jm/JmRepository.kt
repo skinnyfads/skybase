@@ -2,6 +2,32 @@ package com.example.skybase.jm
 
 import com.google.gson.annotations.SerializedName
 
+data class JmLanguagesResponseDto(
+    val items: List<JmLanguageDto> = emptyList()
+)
+
+data class JmLanguageDto(
+    @SerializedName(value = "id", alternate = ["ID"])
+    val id: String? = null,
+    @SerializedName(value = "name", alternate = ["Name"])
+    val name: String? = null
+)
+
+data class JmDifficultyLevelsResponseDto(
+    val items: List<JmDifficultyLevelDto> = emptyList()
+)
+
+data class JmDifficultyLevelDto(
+    @SerializedName(value = "id", alternate = ["ID"])
+    val id: String? = null,
+    @SerializedName(value = "language", alternate = ["Language"])
+    val language: String? = null,
+    @SerializedName(value = "name", alternate = ["Name"])
+    val name: String? = null,
+    @SerializedName(value = "rank", alternate = ["Rank"])
+    val rank: Int? = null
+)
+
 data class JmFeedResponseDto(
     val items: List<JmFeedArticleItemDto> = emptyList(),
     val total: Int = 0,
@@ -121,6 +147,18 @@ data class JmFeedResponse(
     val limit: Int = 20
 )
 
+data class JmLanguage(
+    val id: String? = null,
+    val name: String = ""
+)
+
+data class JmDifficultyLevel(
+    val id: String? = null,
+    val language: String? = null,
+    val name: String = "",
+    val rank: Int? = null
+)
+
 data class JmFeedArticleItem(
     val id: String? = null,
     val previewText: String? = null,
@@ -184,6 +222,12 @@ data class JmVocabularyListResponse(
 class JmRepository(
     private val api: JmApi
 ) {
+    suspend fun fetchLanguages(): List<JmLanguage> = api.getLanguages().items.map { it.toModel() }
+
+    suspend fun fetchVocabLevels(language: String? = null): List<JmDifficultyLevel> = api.getVocabularyLevels(
+        language = language
+    ).items.map { it.toModel() }
+
     suspend fun fetchFeed(
         page: Int,
         limit: Int,
@@ -239,6 +283,18 @@ private fun JmFeedResponseDto.toModel(): JmFeedResponse = JmFeedResponse(
     total = total,
     page = page,
     limit = limit
+)
+
+private fun JmLanguageDto.toModel(): JmLanguage = JmLanguage(
+    id = id,
+    name = name.orEmpty()
+)
+
+private fun JmDifficultyLevelDto.toModel(): JmDifficultyLevel = JmDifficultyLevel(
+    id = id,
+    language = language,
+    name = name.orEmpty(),
+    rank = rank
 )
 
 private fun JmFeedArticleItemDto.toModel(): JmFeedArticleItem = JmFeedArticleItem(

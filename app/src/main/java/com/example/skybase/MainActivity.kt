@@ -50,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import com.example.skybase.jm.JmFlashcardDirection
 import com.example.skybase.jm.JmFragment
 import com.example.skybase.jm.JmSubmenu
 import com.example.skybase.jmnews.JmNewsFragment
@@ -73,6 +74,12 @@ class MainActivity : ComponentActivity() {
         val savedJmSubmenuIndex = preferences
             .getInt(LAST_JM_SUBMENU_INDEX_KEY, 0)
             .coerceIn(0, JmSubmenu.entries.lastIndex)
+        val savedJmLanguage = preferences.getString(JM_LANGUAGE_KEY, "").orEmpty()
+        val savedJmLevel = preferences.getString(JM_LEVEL_KEY, "").orEmpty()
+        val savedJmFlashcardDirection = JmFlashcardDirection.fromValue(
+            preferences.getString(JM_FLASHCARD_DIRECTION_KEY, JmFlashcardDirection.WORD_FIRST.value)
+        )
+        val savedJmHideExampleMeaning = preferences.getBoolean(JM_HIDE_EXAMPLE_MEANING_KEY, false)
 
         setContent {
             var selectedThemeModeIndex by rememberSaveable {
@@ -80,8 +87,17 @@ class MainActivity : ComponentActivity() {
             }
             var selectedTab by rememberSaveable { mutableIntStateOf(savedTabIndex) }
             var selectedJmSubmenuIndex by rememberSaveable { mutableIntStateOf(savedJmSubmenuIndex) }
+            var jmLanguageFilter by rememberSaveable { mutableStateOf(savedJmLanguage) }
+            var jmLevelFilter by rememberSaveable { mutableStateOf(savedJmLevel) }
+            var jmFlashcardDirectionValue by rememberSaveable {
+                mutableStateOf(savedJmFlashcardDirection.value)
+            }
+            var jmHideExampleMeaning by rememberSaveable {
+                mutableStateOf(savedJmHideExampleMeaning)
+            }
             val themeMode = ThemeMode.entries[selectedThemeModeIndex]
             val selectedJmSubmenu = JmSubmenu.entries[selectedJmSubmenuIndex]
+            val jmFlashcardDirection = JmFlashcardDirection.fromValue(jmFlashcardDirectionValue)
 
             val jmNewsListState = rememberLazyListState()
             val learningListState = rememberLazyListState()
@@ -145,7 +161,44 @@ class MainActivity : ComponentActivity() {
                         when (selectedTab) {
                             0 -> JmNewsFragment(modifier = Modifier.fillMaxSize(), listState = jmNewsListState)
                             1 -> com.example.skybase.learning.LearningFragment(modifier = Modifier.fillMaxSize(), listState = learningListState)
-                            2 -> JmFragment(modifier = Modifier.fillMaxSize(), selectedSubmenu = selectedJmSubmenu)
+                            2 -> JmFragment(
+                                modifier = Modifier.fillMaxSize(),
+                                selectedSubmenu = selectedJmSubmenu,
+                                languageFilter = jmLanguageFilter,
+                                levelFilter = jmLevelFilter,
+                                flashcardDirection = jmFlashcardDirection,
+                                hideExampleMeaning = jmHideExampleMeaning,
+                                onLanguageFilterChange = { language ->
+                                    jmLanguageFilter = language
+                                    if (language.isBlank() && jmLevelFilter.isNotBlank()) {
+                                        jmLevelFilter = ""
+                                        preferences.edit()
+                                            .putString(JM_LEVEL_KEY, "")
+                                            .apply()
+                                    }
+                                    preferences.edit()
+                                        .putString(JM_LANGUAGE_KEY, language)
+                                        .apply()
+                                },
+                                onLevelFilterChange = { level ->
+                                    jmLevelFilter = level
+                                    preferences.edit()
+                                        .putString(JM_LEVEL_KEY, level)
+                                        .apply()
+                                },
+                                onFlashcardDirectionChange = { direction ->
+                                    jmFlashcardDirectionValue = direction.value
+                                    preferences.edit()
+                                        .putString(JM_FLASHCARD_DIRECTION_KEY, direction.value)
+                                        .apply()
+                                },
+                                onHideExampleMeaningChange = { hide ->
+                                    jmHideExampleMeaning = hide
+                                    preferences.edit()
+                                        .putBoolean(JM_HIDE_EXAMPLE_MEANING_KEY, hide)
+                                        .apply()
+                                }
+                            )
                             else -> Text(
                                 text = "JM",
                                 style = MaterialTheme.typography.titleMedium
@@ -162,6 +215,10 @@ class MainActivity : ComponentActivity() {
         const val THEME_MODE_INDEX_KEY = "theme_mode_index"
         const val LAST_TAB_INDEX_KEY = "last_tab_index"
         const val LAST_JM_SUBMENU_INDEX_KEY = "last_jm_submenu_index"
+        const val JM_LANGUAGE_KEY = "jm_language"
+        const val JM_LEVEL_KEY = "jm_level"
+        const val JM_FLASHCARD_DIRECTION_KEY = "jm_flashcard_direction"
+        const val JM_HIDE_EXAMPLE_MEANING_KEY = "jm_hide_example_meaning"
     }
 }
 

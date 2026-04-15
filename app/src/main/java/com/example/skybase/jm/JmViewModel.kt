@@ -33,9 +33,22 @@ class JmViewModel : ViewModel() {
     val uiState: StateFlow<JmUiState> = _uiState.asStateFlow()
 
     private var currentPage = 1
+    private var currentLanguageFilter: String? = null
+    private var currentLevelFilter: String? = null
 
     init {
         loadNextPage()
+    }
+
+    fun applyFilters(language: String, level: String) {
+        val normalizedLanguage = normalizeFilter(language)
+        val normalizedLevel = normalizeFilter(level)
+        val nextLevel = if (normalizedLanguage == null) null else normalizedLevel
+        if (currentLanguageFilter == normalizedLanguage && currentLevelFilter == nextLevel) return
+
+        currentLanguageFilter = normalizedLanguage
+        currentLevelFilter = nextLevel
+        reloadFeedForFilters()
     }
 
     fun openArticle(articleId: String) {
@@ -83,7 +96,9 @@ class JmViewModel : ViewModel() {
             try {
                 val response = repository.fetchFeed(
                     page = currentPage,
-                    limit = PAGE_SIZE
+                    limit = PAGE_SIZE,
+                    language = currentLanguageFilter,
+                    level = currentLevelFilter
                 )
                 val pageValue = response.page.takeIf { it > 0 } ?: currentPage
                 val limitValue = response.limit.takeIf { it > 0 } ?: PAGE_SIZE
@@ -133,7 +148,9 @@ class JmViewModel : ViewModel() {
             try {
                 val response = repository.fetchFeed(
                     page = currentPage,
-                    limit = PAGE_SIZE
+                    limit = PAGE_SIZE,
+                    language = currentLanguageFilter,
+                    level = currentLevelFilter
                 )
                 val pageValue = response.page.takeIf { it > 0 } ?: currentPage
                 val limitValue = response.limit.takeIf { it > 0 } ?: PAGE_SIZE
@@ -266,6 +283,65 @@ class JmViewModel : ViewModel() {
 
     private fun buildVocabularyKey(word: String, language: String): String {
         return "${language.trim().lowercase()}::${word.trim()}"
+    }
+
+    private fun normalizeFilter(value: String): String? = value.trim().takeIf { it.isNotEmpty() }
+
+    private fun reloadFeedForFilters() {
+        if (_uiState.value.isLoading) return
+
+        currentPage = 1
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    items = emptyList(),
+                    selectedArticleId = null,
+                    articleDetail = null,
+                    isLoading = true,
+                    isRefreshing = false,
+                    hasNextPage = true,
+                    errorMessage = null
+                )
+            }
+            try {
+                val response = repository.fetchFeed(
+                    page = currentPage,
+                    limit = PAGE_SIZE,
+                    language = currentLanguageFilter,
+                    level = currentLevelFilter
+                )
+                val pageValue = response.page.takeIf { it > 0 } ?: currentPage
+                val limitValue = response.limit.takeIf { it > 0 } ?: PAGE_SIZE
+                val hasNext = response.total > (pageValue * limitValue)
+
+                _uiState.update {
+                    it.copy(
+                        items = response.items,
+                        isLoading = false,
+                        isRefreshing = false,
+                        hasNextPage = hasNext,
+                        errorMessage = null
+                    )
+                }
+                currentPage = pageValue + 1
+            } catch (exception: IOException) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        errorMessage = "Unable to load feed. Check your connection and try again."
+                    )
+                }
+            } catch (exception: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        errorMessage = "Unable to load feed right now. Please try again."
+                    )
+                }
+            }
+        }
     }
 
     private companion object {

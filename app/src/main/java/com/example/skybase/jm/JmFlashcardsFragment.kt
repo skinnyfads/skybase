@@ -52,11 +52,22 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 @Composable
 fun JmFlashcardsFragment(
     modifier: Modifier = Modifier,
+    languageFilter: String = "",
+    levelFilter: String = "",
+    flashcardDirection: JmFlashcardDirection = JmFlashcardDirection.WORD_FIRST,
+    hideExampleMeaning: Boolean = false,
     viewModel: JmFlashcardsViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val currentCard = uiState.deck.getOrNull(uiState.currentIndex)
     var examplesVocabId by rememberSaveable { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(languageFilter, levelFilter) {
+        viewModel.applyFilters(
+            language = languageFilter,
+            level = levelFilter
+        )
+    }
 
     LaunchedEffect(currentCard?.id) {
         if (examplesVocabId != null && examplesVocabId != currentCard?.id) {
@@ -101,6 +112,7 @@ fun JmFlashcardsFragment(
                     FlashcardsDeckContent(
                         card = currentCard,
                         uiState = uiState,
+                        flashcardDirection = flashcardDirection,
                         onReveal = viewModel::revealCurrentCard,
                         onRate = viewModel::rateCard,
                         onOpenExamples = {
@@ -117,6 +129,7 @@ fun JmFlashcardsFragment(
         if (examplesVocabulary != null) {
             FlashcardExamplesPopover(
                 vocabulary = examplesVocabulary,
+                hideExampleMeaning = hideExampleMeaning,
                 isMutating = uiState.isMutatingVocabulary && uiState.mutatingVocabularyId == examplesVocabulary.id,
                 actionError = uiState.vocabularyActionError,
                 onDismiss = {
@@ -187,6 +200,7 @@ private fun FlashcardsEmptyState() {
 private fun FlashcardsDeckContent(
     card: JmVocabularyResponse,
     uiState: JmFlashcardsUiState,
+    flashcardDirection: JmFlashcardDirection,
     onReveal: () -> Unit,
     onRate: (JmFlashcardRating) -> Unit,
     onOpenExamples: () -> Unit
@@ -205,6 +219,7 @@ private fun FlashcardsDeckContent(
             FlashcardCard(
                 card = card,
                 isFlipped = uiState.isFlipped,
+                direction = flashcardDirection,
                 onFlip = onReveal,
                 onOpenExamples = onOpenExamples
             )
@@ -279,6 +294,7 @@ private fun FlashcardsDeckContent(
 private fun FlashcardCard(
     card: JmVocabularyResponse,
     isFlipped: Boolean,
+    direction: JmFlashcardDirection,
     onFlip: () -> Unit,
     onOpenExamples: () -> Unit
 ) {
@@ -286,6 +302,12 @@ private fun FlashcardCard(
     val reading = card.readings.filter { it.isNotBlank() }.joinToString(", ")
     val meaning = card.meanings.filter { it.isNotBlank() }.joinToString("; ")
     val hasExamples = card.examples.isNotEmpty()
+    val frontType = when (direction) {
+        JmFlashcardDirection.MEANING_FIRST -> if (meaning.isNotBlank()) "meaning" else "word"
+        JmFlashcardDirection.READING_FIRST -> if (reading.isNotBlank()) "reading" else "word"
+        JmFlashcardDirection.WORD_FIRST -> "word"
+    }
+    val canOpenExamples = isFlipped && hasExamples
     val backAlpha by animateFloatAsState(
         targetValue = if (isFlipped) 1f else 0f,
         label = "flashcard-back-alpha"
@@ -317,21 +339,42 @@ private fun FlashcardCard(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text(
-                    text = word,
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    modifier = if (isFlipped && hasExamples) {
-                        Modifier.clickable(
-                            interactionSource = wordInteraction,
-                            indication = null,
-                            onClick = onOpenExamples
+                when (frontType) {
+                    "meaning" -> {
+                        Text(
+                            text = meaning.ifBlank { "-" },
+                            style = MaterialTheme.typography.titleLarge,
+                            textAlign = TextAlign.Center
                         )
-                    } else {
-                        Modifier
                     }
-                )
+
+                    "reading" -> {
+                        Text(
+                            text = reading.ifBlank { word },
+                            style = MaterialTheme.typography.displaySmall,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+
+                    else -> {
+                        Text(
+                            text = word,
+                            style = MaterialTheme.typography.displaySmall,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            modifier = if (canOpenExamples) {
+                                Modifier.clickable(
+                                    interactionSource = wordInteraction,
+                                    indication = null,
+                                    onClick = onOpenExamples
+                                )
+                            } else {
+                                Modifier
+                            }
+                        )
+                    }
+                }
 
                 Column(
                     modifier = Modifier
@@ -340,14 +383,37 @@ private fun FlashcardCard(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    if (reading.isNotBlank() || meaning.isNotBlank()) {
+                    val showBackWord = frontType != "word"
+                    val showBackReading = frontType != "reading" && reading.isNotBlank()
+                    val showBackMeaning = frontType != "meaning" && meaning.isNotBlank()
+                    val showDivider = showBackWord || showBackReading || showBackMeaning
+
+                    if (showDivider) {
                         HorizontalDivider(
                             modifier = Modifier.width(64.dp),
                             thickness = 2.dp
                         )
                     }
 
-                    if (reading.isNotBlank()) {
+                    if (showBackWord) {
+                        Text(
+                            text = word,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            modifier = if (canOpenExamples) {
+                                Modifier.clickable(
+                                    interactionSource = wordInteraction,
+                                    indication = null,
+                                    onClick = onOpenExamples
+                                )
+                            } else {
+                                Modifier
+                            }
+                        )
+                    }
+
+                    if (showBackReading) {
                         Text(
                             text = reading,
                             style = MaterialTheme.typography.titleLarge,
@@ -356,7 +422,7 @@ private fun FlashcardCard(
                         )
                     }
 
-                    if (meaning.isNotBlank()) {
+                    if (showBackMeaning) {
                         Text(
                             text = meaning,
                             style = MaterialTheme.typography.titleMedium,
@@ -460,6 +526,7 @@ private fun FlashcardsFinishedState(
 @Composable
 private fun FlashcardExamplesPopover(
     vocabulary: JmVocabularyResponse,
+    hideExampleMeaning: Boolean,
     isMutating: Boolean,
     actionError: String?,
     onDismiss: () -> Unit,
@@ -468,6 +535,9 @@ private fun FlashcardExamplesPopover(
     val reading = vocabulary.readings.filter { it.isNotBlank() }.joinToString(", ")
     val backdropInteraction = remember { MutableInteractionSource() }
     val cardInteraction = remember { MutableInteractionSource() }
+    var revealedMeaningIndexes by remember(vocabulary.id, hideExampleMeaning) {
+        mutableStateOf(emptySet<Int>())
+    }
 
     Box(
         modifier = Modifier
@@ -537,13 +607,31 @@ private fun FlashcardExamplesPopover(
                             style = MaterialTheme.typography.bodyMedium
                         )
                     } else {
-                        vocabulary.examples.forEach { example ->
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        vocabulary.examples.forEachIndexed { index, example ->
+                            val isMeaningVisible = !hideExampleMeaning || revealedMeaningIndexes.contains(index)
+                            Column(
+                                modifier = if (hideExampleMeaning) {
+                                    Modifier.clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                        onClick = {
+                                            revealedMeaningIndexes = if (revealedMeaningIndexes.contains(index)) {
+                                                revealedMeaningIndexes - index
+                                            } else {
+                                                revealedMeaningIndexes + index
+                                            }
+                                        }
+                                    )
+                                } else {
+                                    Modifier
+                                },
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
                                 Text(
                                     text = example.sentence.orEmpty(),
                                     style = MaterialTheme.typography.bodyLarge
                                 )
-                                example.meaning?.takeIf { it.isNotBlank() }?.let { meaning ->
+                                example.meaning?.takeIf { it.isNotBlank() && isMeaningVisible }?.let { meaning ->
                                     Text(
                                         text = meaning,
                                         style = MaterialTheme.typography.bodySmall,

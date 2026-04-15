@@ -10,6 +10,14 @@ import retrofit2.http.Query
 import retrofit2.http.DELETE
 
 interface JmApi {
+    @GET("languages")
+    suspend fun getLanguages(): JmLanguagesResponseDto
+
+    @GET("vocabs/levels")
+    suspend fun getVocabularyLevels(
+        @Query("language") language: String? = null
+    ): JmDifficultyLevelsResponseDto
+
     @GET("articles/feed")
     suspend fun getFeed(
         @Query("page") page: Int,
