@@ -63,6 +63,7 @@ fun JmFlashcardsFragment(
     val uiState by viewModel.uiState.collectAsState()
     val currentCard = uiState.deck.getOrNull(uiState.currentIndex)
     var examplesVocabId by rememberSaveable { mutableStateOf<String?>(null) }
+    var isDeckOverviewVisible by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(languageFilter, levelFilter) {
         viewModel.applyFilters(
@@ -118,16 +119,21 @@ fun JmFlashcardsFragment(
                         onReveal = viewModel::revealCurrentCard,
                         onRate = viewModel::rateCard,
                         onOpenExamples = {
+                            isDeckOverviewVisible = false
                             currentCard.id?.let { id ->
                                 examplesVocabId = id
                                 viewModel.clearVocabularyActionError()
                             }
+                        },
+                        onOpenDeckOverview = {
+                            examplesVocabId = null
+                            viewModel.clearVocabularyActionError()
+                            isDeckOverviewVisible = true
                         }
                     )
                 }
             }
         }
-
         if (examplesVocabulary != null) {
             FlashcardExamplesPopover(
                 vocabulary = examplesVocabulary,
@@ -142,6 +148,14 @@ fun JmFlashcardsFragment(
                     val vocabId = examplesVocabulary.id ?: return@FlashcardExamplesPopover
                     viewModel.toggleVocabularyDeleted(vocabId)
                 }
+            )
+        }
+
+        if (isDeckOverviewVisible && uiState.deck.isNotEmpty()) {
+            FlashcardsDeckOverviewPopover(
+                deck = uiState.deck,
+                currentIndex = uiState.currentIndex,
+                onDismiss = { isDeckOverviewVisible = false }
             )
         }
     }
@@ -205,7 +219,8 @@ private fun FlashcardsDeckContent(
     flashcardDirection: JmFlashcardDirection,
     onReveal: () -> Unit,
     onRate: (JmFlashcardRating) -> Unit,
-    onOpenExamples: () -> Unit
+    onOpenExamples: () -> Unit,
+    onOpenDeckOverview: () -> Unit
 ) {
     val cardsRemaining = (uiState.deck.size - uiState.currentIndex).coerceAtLeast(0)
 
@@ -288,12 +303,13 @@ private fun FlashcardsDeckContent(
                 }
             }
         }
-
         Text(
             text = "Cards remaining: $cardsRemaining",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.align(Alignment.End)
+            modifier = Modifier
+                .align(Alignment.End)
+                .clickable(onClick = onOpenDeckOverview)
         )
     }
 }
@@ -528,6 +544,124 @@ private fun FlashcardsFinishedState(
         }
     }
 }
+
+@Composable
+private fun FlashcardsDeckOverviewPopover(
+    deck: List<JmVocabularyResponse>,
+    currentIndex: Int,
+    onDismiss: () -> Unit
+) {
+    val backdropInteraction = remember { MutableInteractionSource() }
+    val cardInteraction = remember { MutableInteractionSource() }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.6f))
+            .clickable(
+                interactionSource = backdropInteraction,
+                indication = null,
+                onClick = onDismiss
+            ),
+        contentAlignment = Alignment.TopCenter
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 448.dp)
+                .padding(top = 48.dp, start = 16.dp, end = 16.dp)
+                .clickable(
+                    interactionSource = cardInteraction,
+                    indication = null,
+                    onClick = {}
+                )
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, top = 16.dp, end = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "Current Flashcards",
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                        Text(
+                            text = "${deck.size} cards",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "Close flashcards list"
+                        )
+                    }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    deck.forEachIndexed { index, vocab ->
+                        val word = vocab.word.orEmpty().ifBlank { "-" }
+                        val meaning = vocab.meanings.filter { it.isNotBlank() }.joinToString("; ").ifBlank { "-" }
+                        val isCurrentCard = index == currentIndex
+
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "${index + 1}. $word",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = if (isCurrentCard) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                if (isCurrentCard) {
+                                    Text(
+                                        text = "Current",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                            Text(
+                                text = meaning,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (index != deck.lastIndex) {
+                            HorizontalDivider()
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
 
 @Composable
 private fun FlashcardExamplesPopover(
