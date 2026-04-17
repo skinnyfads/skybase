@@ -7,6 +7,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -46,6 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
@@ -236,9 +238,19 @@ private fun FlashcardsDeckContent(
                     onClick = onReveal,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp)
+                        .height(64.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                 ) {
-                    Text(text = "Show Answer")
+                    Text(
+                        text = "Show Answer",
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1
+                    )
                 }
             } else {
                 Row(
@@ -247,7 +259,6 @@ private fun FlashcardsDeckContent(
                 ) {
                     RatingButton(
                         label = "Again",
-                        shortcutLabel = "1",
                         onClick = { onRate(JmFlashcardRating.AGAIN) },
                         modifier = Modifier.weight(1f),
                         containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.12f),
@@ -255,7 +266,6 @@ private fun FlashcardsDeckContent(
                     )
                     RatingButton(
                         label = "Hard",
-                        shortcutLabel = "2",
                         onClick = { onRate(JmFlashcardRating.HARD) },
                         modifier = Modifier.weight(1f),
                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -263,7 +273,6 @@ private fun FlashcardsDeckContent(
                     )
                     RatingButton(
                         label = "Good",
-                        shortcutLabel = "3",
                         onClick = { onRate(JmFlashcardRating.GOOD) },
                         modifier = Modifier.weight(1f),
                         containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
@@ -271,7 +280,6 @@ private fun FlashcardsDeckContent(
                     )
                     RatingButton(
                         label = "Easy",
-                        shortcutLabel = "4",
                         onClick = { onRate(JmFlashcardRating.EASY) },
                         modifier = Modifier.weight(1f),
                         containerColor = Color(0x2232CD32),
@@ -450,7 +458,6 @@ private fun FlashcardCard(
 @Composable
 private fun RatingButton(
     label: String,
-    shortcutLabel: String,
     onClick: () -> Unit,
     modifier: Modifier,
     containerColor: Color,
@@ -460,6 +467,7 @@ private fun RatingButton(
         onClick = onClick,
         modifier = modifier.height(64.dp),
         shape = RoundedCornerShape(10.dp),
+        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = containerColor,
             contentColor = contentColor
@@ -468,13 +476,11 @@ private fun RatingButton(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelLarge,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                text = shortcutLabel,
-                style = MaterialTheme.typography.labelSmall,
-                color = contentColor.copy(alpha = 0.7f)
+                style = MaterialTheme.typography.labelMedium,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
