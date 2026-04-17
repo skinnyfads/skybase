@@ -50,6 +50,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlin.random.Random
 
 @Composable
 fun JmFlashcardsFragment(
@@ -326,9 +327,13 @@ private fun FlashcardCard(
     val reading = card.readings.filter { it.isNotBlank() }.joinToString(", ")
     val meaning = card.meanings.filter { it.isNotBlank() }.joinToString("; ")
     val hasExamples = card.examples.isNotEmpty()
+    val randomFrontType = remember(card.id, word, meaning) {
+        if (meaning.isBlank()) "word" else if (Random.nextBoolean()) "word" else "meaning"
+    }
     val frontType = when (direction) {
         JmFlashcardDirection.MEANING_FIRST -> if (meaning.isNotBlank()) "meaning" else "word"
         JmFlashcardDirection.READING_FIRST -> if (reading.isNotBlank()) "reading" else "word"
+        JmFlashcardDirection.RANDOM -> randomFrontType
         JmFlashcardDirection.WORD_FIRST -> "word"
     }
     val canOpenExamples = isFlipped && hasExamples
