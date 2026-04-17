@@ -19,10 +19,15 @@ fun JmFragment(
     levelFilter: String = "",
     flashcardDirection: JmFlashcardDirection = JmFlashcardDirection.WORD_FIRST,
     hideExampleMeaning: Boolean = false,
+    dailyReminderEnabled: Boolean = false,
+    dailyReminderHour: Int = 20,
+    dailyReminderMinute: Int = 0,
     onLanguageFilterChange: (String) -> Unit = {},
     onLevelFilterChange: (String) -> Unit = {},
     onFlashcardDirectionChange: (JmFlashcardDirection) -> Unit = {},
-    onHideExampleMeaningChange: (Boolean) -> Unit = {}
+    onHideExampleMeaningChange: (Boolean) -> Unit = {},
+    onDailyReminderEnabledChange: (Boolean) -> Unit = {},
+    onDailyReminderTimeChange: (Int, Int) -> Unit = { _, _ -> }
 ) {
     Column(modifier = modifier.fillMaxSize()) {
         when (selectedSubmenu) {
@@ -51,10 +56,15 @@ fun JmFragment(
                     selectedLevel = levelFilter,
                     selectedFlashcardDirection = flashcardDirection,
                     hideExampleMeaning = hideExampleMeaning,
+                    dailyReminderEnabled = dailyReminderEnabled,
+                    dailyReminderHour = dailyReminderHour,
+                    dailyReminderMinute = dailyReminderMinute,
                     onLanguageChange = onLanguageFilterChange,
                     onLevelChange = onLevelFilterChange,
                     onFlashcardDirectionChange = onFlashcardDirectionChange,
-                    onHideExampleMeaningChange = onHideExampleMeaningChange
+                    onHideExampleMeaningChange = onHideExampleMeaningChange,
+                    onDailyReminderEnabledChange = onDailyReminderEnabledChange,
+                    onDailyReminderTimeChange = onDailyReminderTimeChange
                 )
             }
         }

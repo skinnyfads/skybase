@@ -1,5 +1,6 @@
 package com.example.skybase.jm
 
+import android.app.TimePickerDialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,8 +25,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import java.util.Locale
 
 @Composable
 fun JmSettingsFragment(
@@ -34,12 +37,18 @@ fun JmSettingsFragment(
     selectedLevel: String,
     selectedFlashcardDirection: JmFlashcardDirection,
     hideExampleMeaning: Boolean,
+    dailyReminderEnabled: Boolean,
+    dailyReminderHour: Int,
+    dailyReminderMinute: Int,
     onLanguageChange: (String) -> Unit,
     onLevelChange: (String) -> Unit,
     onFlashcardDirectionChange: (JmFlashcardDirection) -> Unit,
     onHideExampleMeaningChange: (Boolean) -> Unit,
+    onDailyReminderEnabledChange: (Boolean) -> Unit,
+    onDailyReminderTimeChange: (Int, Int) -> Unit,
     viewModel: JmSettingsViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
 
     LaunchedEffect(selectedLanguage) {
@@ -131,6 +140,52 @@ fun JmSettingsFragment(
                 onFlashcardDirectionChange(JmFlashcardDirection.fromValue(selected))
             }
         )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "Daily flashcards reminder",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = "Notify me to practice 5 random flashcards each day.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Uses current filters: ${selectedLanguage.ifBlank { "All Languages" }} • ${selectedLevel.ifBlank { "All Levels" }}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = dailyReminderEnabled,
+                onCheckedChange = onDailyReminderEnabledChange
+            )
+        }
+
+        OutlinedButton(
+            onClick = {
+                TimePickerDialog(
+                    context,
+                    { _, hour, minute -> onDailyReminderTimeChange(hour, minute) },
+                    dailyReminderHour,
+                    dailyReminderMinute,
+                    true
+                ).show()
+            },
+            enabled = dailyReminderEnabled,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(text = "Notification time: ${formatTime(dailyReminderHour, dailyReminderMinute)}")
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -246,4 +301,8 @@ private fun SettingsSelector(
             }
         }
     }
+}
+
+private fun formatTime(hour: Int, minute: Int): String {
+    return String.format(Locale.US, "%02d:%02d", hour.coerceIn(0, 23), minute.coerceIn(0, 59))
 }
