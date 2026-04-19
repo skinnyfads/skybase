@@ -1,5 +1,6 @@
 package com.example.skybase.jm
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
@@ -26,7 +27,9 @@ data class JmUiState(
     val addingVocabularyKey: String? = null,
     val addedVocabularyKeys: Set<String> = emptySet(),
     val addVocabularyError: String? = null,
-    val addVocabularySuccess: Boolean = false
+    val addVocabularySuccess: Boolean = false,
+    val currentArticleIndex: Int = -1,
+    val feedTotal: Int = 0
 )
 
 class JmViewModel : ViewModel() {
@@ -39,6 +42,13 @@ class JmViewModel : ViewModel() {
     private var currentLevelFilter: String? = null
     private var feedJob: Job? = null
     private var pendingOpenNextAfterPageLoad = false
+
+    private val articleCache = object : LinkedHashMap<String, JmArticleDetail>(32, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, JmArticleDetail>): Boolean {
+            return size > MAX_CACHE_SIZE
+        }
+    }
+    private val preloadJobs = mutableMapOf<String, Job>()
 
     init {
         loadNextPage()
@@ -57,15 +67,38 @@ class JmViewModel : ViewModel() {
 
     fun openArticle(articleId: String) {
         if (articleId.isBlank()) return
-        _uiState.update {
-            it.copy(
-                selectedArticleId = articleId,
-                articleDetail = null,
-                isLoadingArticle = true,
-                articleErrorMessage = null
-            )
+
+        val currentIndex = _uiState.value.items.indexOfFirst { it.id == articleId }
+        val cached = articleCache[articleId]
+
+        if (cached != null) {
+            val existingAddedKeys = extractAddedVocabularyKeys(cached)
+            _uiState.update {
+                it.copy(
+                    selectedArticleId = articleId,
+                    articleDetail = cached,
+                    isLoadingArticle = false,
+                    articleErrorMessage = null,
+                    currentArticleIndex = currentIndex,
+                    addedVocabularyKeys = it.addedVocabularyKeys + existingAddedKeys
+                )
+            }
+            preloadSurroundingArticles(currentIndex)
+            prefetchFeedPageIfNeeded(currentIndex)
+            Log.d(TAG, "Article cache HIT: $articleId (index $currentIndex)")
+        } else {
+            _uiState.update {
+                it.copy(
+                    selectedArticleId = articleId,
+                    articleDetail = null,
+                    isLoadingArticle = true,
+                    articleErrorMessage = null,
+                    currentArticleIndex = currentIndex
+                )
+            }
+            loadArticle(articleId)
+            Log.d(TAG, "Article cache MISS: $articleId (index $currentIndex)")
         }
-        loadArticle(articleId)
     }
 
     fun closeArticle() {
@@ -74,7 +107,8 @@ class JmViewModel : ViewModel() {
                 selectedArticleId = null,
                 articleDetail = null,
                 isLoadingArticle = false,
-                articleErrorMessage = null
+                articleErrorMessage = null,
+                currentArticleIndex = -1
             )
         }
     }
@@ -116,11 +150,13 @@ class JmViewModel : ViewModel() {
                 val limitValue = response.limit.takeIf { it > 0 } ?: PAGE_SIZE
                 val hasNext = response.total > (pageValue * limitValue)
 
+                val isFirstPage = currentPage == 1
                 _uiState.update {
                     it.copy(
                         items = it.items + response.items,
                         isLoading = false,
                         hasNextPage = hasNext,
+                        feedTotal = response.total,
                         errorMessage = null
                     )
                 }
@@ -128,6 +164,9 @@ class JmViewModel : ViewModel() {
                 if (pendingOpenNextAfterPageLoad) {
                     pendingOpenNextAfterPageLoad = false
                     openAdjacentArticle(offset = 1)
+                }
+                if (isFirstPage) {
+                    preloadTopArticles(count = TOP_PRELOAD_COUNT)
                 }
             } catch (exception: CancellationException) {
                 throw exception
@@ -183,10 +222,14 @@ class JmViewModel : ViewModel() {
                         isLoading = false,
                         isRefreshing = false,
                         hasNextPage = hasNext,
+                        feedTotal = response.total,
                         errorMessage = null
                     )
                 }
                 currentPage = pageValue + 1
+                articleCache.clear()
+                cancelAllPreloads()
+                preloadTopArticles(count = TOP_PRELOAD_COUNT)
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: IOException) {
@@ -215,21 +258,23 @@ class JmViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val response = repository.fetchArticle(articleId)
-                val language = response.language
-                val existingAddedKeys = response.tokens.mapNotNull { token ->
-                    val word = token.dictionaryForm?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-                    if (!token.addedToVocabulary || language.isNullOrBlank()) return@mapNotNull null
-                    buildVocabularyKey(word = word, language = language)
-                }.toSet()
+                articleCache[articleId] = response
+
+                val existingAddedKeys = extractAddedVocabularyKeys(response)
+                val currentIndex = _uiState.value.items.indexOfFirst { it.id == articleId }
 
                 _uiState.update {
                     it.copy(
                         articleDetail = response,
                         isLoadingArticle = false,
                         articleErrorMessage = null,
+                        currentArticleIndex = currentIndex,
                         addedVocabularyKeys = it.addedVocabularyKeys + existingAddedKeys
                     )
                 }
+
+                preloadSurroundingArticles(currentIndex)
+                prefetchFeedPageIfNeeded(currentIndex)
             } catch (exception: IOException) {
                 _uiState.update {
                     it.copy(
@@ -246,6 +291,78 @@ class JmViewModel : ViewModel() {
                 }
             }
         }
+    }
+
+    private fun extractAddedVocabularyKeys(article: JmArticleDetail): Set<String> {
+        val language = article.language ?: return emptySet()
+        if (language.isBlank()) return emptySet()
+        return article.tokens.mapNotNull { token ->
+            val word = token.dictionaryForm?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            if (!token.addedToVocabulary) return@mapNotNull null
+            buildVocabularyKey(word = word, language = language)
+        }.toSet()
+    }
+
+    private fun preloadSurroundingArticles(currentIndex: Int) {
+        if (currentIndex < 0) return
+        val state = _uiState.value
+        val indicesToPreload = listOf(
+            currentIndex + 1,
+            currentIndex + 2,
+            currentIndex - 1
+        )
+        for (index in indicesToPreload) {
+            val articleId = state.items.getOrNull(index)?.id
+            if (articleId.isNullOrBlank()) continue
+            if (articleCache.containsKey(articleId)) continue
+            preloadArticle(articleId)
+        }
+    }
+
+    private fun preloadTopArticles(count: Int) {
+        val state = _uiState.value
+        val toPreload = state.items.take(count)
+        for (article in toPreload) {
+            val articleId = article.id
+            if (articleId.isNullOrBlank()) continue
+            if (articleCache.containsKey(articleId)) continue
+            preloadArticle(articleId)
+        }
+    }
+
+    private fun preloadArticle(articleId: String) {
+        if (preloadJobs[articleId]?.isActive == true) return
+
+        preloadJobs[articleId] = viewModelScope.launch {
+            try {
+                val response = repository.fetchArticle(articleId)
+                articleCache[articleId] = response
+                Log.d(TAG, "Preloaded article: $articleId")
+            } catch (_: CancellationException) {
+                throw CancellationException()
+            } catch (_: Exception) {
+                Log.d(TAG, "Preload failed for article: $articleId")
+            } finally {
+                preloadJobs.remove(articleId)
+            }
+        }
+    }
+
+    private fun prefetchFeedPageIfNeeded(currentIndex: Int) {
+        if (currentIndex < 0) return
+        val state = _uiState.value
+        if (currentIndex >= state.items.size - FEED_PREFETCH_THRESHOLD
+            && state.hasNextPage
+            && !state.isLoading
+        ) {
+            Log.d(TAG, "Prefetching next feed page (reading article at index $currentIndex, ${state.items.size} loaded)")
+            loadNextPage()
+        }
+    }
+
+    private fun cancelAllPreloads() {
+        preloadJobs.values.forEach { it.cancel() }
+        preloadJobs.clear()
     }
 
     fun addVocabulary(word: String, language: String) {
@@ -337,6 +454,8 @@ class JmViewModel : ViewModel() {
     private fun reloadFeedForFilters() {
         feedJob?.cancel()
         pendingOpenNextAfterPageLoad = false
+        articleCache.clear()
+        cancelAllPreloads()
 
         currentPage = 1
         feedJob = viewModelScope.launch {
@@ -348,7 +467,9 @@ class JmViewModel : ViewModel() {
                     isLoading = true,
                     isRefreshing = false,
                     hasNextPage = true,
-                    errorMessage = null
+                    errorMessage = null,
+                    currentArticleIndex = -1,
+                    feedTotal = 0
                 )
             }
             try {
@@ -368,6 +489,7 @@ class JmViewModel : ViewModel() {
                         isLoading = false,
                         isRefreshing = false,
                         hasNextPage = hasNext,
+                        feedTotal = response.total,
                         errorMessage = null
                     )
                 }
@@ -376,6 +498,7 @@ class JmViewModel : ViewModel() {
                     pendingOpenNextAfterPageLoad = false
                     openAdjacentArticle(offset = 1)
                 }
+                preloadTopArticles(count = TOP_PRELOAD_COUNT)
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: IOException) {
@@ -402,5 +525,9 @@ class JmViewModel : ViewModel() {
 
     private companion object {
         const val PAGE_SIZE = 20
+        const val MAX_CACHE_SIZE = 20
+        const val TOP_PRELOAD_COUNT = 3
+        const val FEED_PREFETCH_THRESHOLD = 4
+        const val TAG = "JmViewModel"
     }
 }

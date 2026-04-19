@@ -289,6 +289,19 @@ private fun JmArticleDetail(
             }
         }
 
+        if (swipeDirection == SwipeArticleDirection.NONE && uiState.currentArticleIndex >= 0) {
+            val displayIndex = uiState.currentArticleIndex + 1
+            val total = if (uiState.feedTotal > 0) uiState.feedTotal else uiState.items.size
+            Text(
+                text = "$displayIndex / $total",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(bottom = 8.dp, end = 4.dp)
+            )
+        }
+
         if (swipeDirection == SwipeArticleDirection.PREVIOUS) {
             SwipePullIndicator(
                 modifier = Modifier
