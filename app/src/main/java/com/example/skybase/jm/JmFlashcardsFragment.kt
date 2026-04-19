@@ -766,21 +766,25 @@ private fun FlashcardExamplesPopover(
                         vocabulary.examples.forEachIndexed { index, example ->
                             val isMeaningVisible = !hideExampleMeaning || revealedMeaningIndexes.contains(index)
                             Column(
-                                modifier = if (hideExampleMeaning) {
-                                    Modifier.clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null,
-                                        onClick = {
-                                            revealedMeaningIndexes = if (revealedMeaningIndexes.contains(index)) {
-                                                revealedMeaningIndexes - index
-                                            } else {
-                                                revealedMeaningIndexes + index
-                                            }
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .then(
+                                        if (hideExampleMeaning) {
+                                            Modifier.clickable(
+                                                interactionSource = remember { MutableInteractionSource() },
+                                                indication = null,
+                                                onClick = {
+                                                    revealedMeaningIndexes = if (revealedMeaningIndexes.contains(index)) {
+                                                        revealedMeaningIndexes - index
+                                                    } else {
+                                                        revealedMeaningIndexes + index
+                                                    }
+                                                }
+                                            )
+                                        } else {
+                                            Modifier
                                         }
-                                    )
-                                } else {
-                                    Modifier
-                                },
+                                    ),
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 Text(
