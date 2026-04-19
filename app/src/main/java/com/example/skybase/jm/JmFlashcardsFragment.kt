@@ -224,6 +224,21 @@ private fun FlashcardsDeckContent(
     onOpenDeckOverview: () -> Unit
 ) {
     val cardsRemaining = (uiState.deck.size - uiState.currentIndex).coerceAtLeast(0)
+    val randomDirectionToggle = remember { mutableMapOf<String, Boolean>() }
+    val resolvedDirection = remember(card.id, uiState.currentIndex, flashcardDirection) {
+        if (flashcardDirection == JmFlashcardDirection.RANDOM && card.id != null) {
+            val lastWasWordFirst = randomDirectionToggle[card.id]
+            val useWordFirst = if (lastWasWordFirst == null) {
+                kotlin.random.Random.nextBoolean()
+            } else {
+                !lastWasWordFirst
+            }
+            randomDirectionToggle[card.id!!] = useWordFirst
+            if (useWordFirst) JmFlashcardDirection.WORD_FIRST else JmFlashcardDirection.MEANING_FIRST
+        } else {
+            flashcardDirection
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -237,7 +252,7 @@ private fun FlashcardsDeckContent(
             FlashcardCard(
                 card = card,
                 isFlipped = uiState.isFlipped,
-                direction = flashcardDirection,
+                direction = resolvedDirection,
                 onFlip = onReveal,
                 onOpenExamples = onOpenExamples
             )
@@ -327,14 +342,10 @@ private fun FlashcardCard(
     val reading = card.readings.filter { it.isNotBlank() }.joinToString(", ")
     val meaning = card.meanings.filter { it.isNotBlank() }.joinToString("; ")
     val hasExamples = card.examples.isNotEmpty()
-    val randomFrontType = remember(card.id, word, meaning) {
-        if (meaning.isBlank()) "word" else if (Random.nextBoolean()) "word" else "meaning"
-    }
     val frontType = when (direction) {
         JmFlashcardDirection.MEANING_FIRST -> if (meaning.isNotBlank()) "meaning" else "word"
         JmFlashcardDirection.READING_FIRST -> if (reading.isNotBlank()) "reading" else "word"
-        JmFlashcardDirection.RANDOM -> randomFrontType
-        JmFlashcardDirection.WORD_FIRST -> "word"
+        else -> "word"
     }
     val canOpenExamples = isFlipped && hasExamples
     val backAlpha by animateFloatAsState(
