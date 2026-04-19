@@ -33,10 +33,12 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -93,6 +95,7 @@ class MainActivity : ComponentActivity() {
         val savedJmDailyReminderEnabled = preferences.getBoolean(JM_DAILY_REMINDER_ENABLED_KEY, false)
         val savedJmDailyReminderHour = preferences.getInt(JM_DAILY_REMINDER_HOUR_KEY, 20).coerceIn(0, 23)
         val savedJmDailyReminderMinute = preferences.getInt(JM_DAILY_REMINDER_MINUTE_KEY, 0).coerceIn(0, 59)
+        val savedFocusMode = preferences.getBoolean(FOCUS_MODE_KEY, false)
 
         JmDailyReminderScheduler.updateSchedule(
             context = this,
@@ -126,6 +129,7 @@ class MainActivity : ComponentActivity() {
             var jmDailyReminderMinute by rememberSaveable {
                 mutableIntStateOf(savedJmDailyReminderMinute)
             }
+            var focusMode by rememberSaveable { mutableStateOf(savedFocusMode) }
 
             val context = LocalContext.current
             val themeMode = ThemeMode.entries[selectedThemeModeIndex]
@@ -178,29 +182,38 @@ class MainActivity : ComponentActivity() {
                                 preferences.edit()
                                     .putInt(LAST_JM_SUBMENU_INDEX_KEY, submenuIndex)
                                     .apply()
+                            },
+                            focusMode = focusMode,
+                            onFocusModeChanged = { enabled ->
+                                focusMode = enabled
+                                preferences.edit()
+                                    .putBoolean(FOCUS_MODE_KEY, enabled)
+                                    .apply()
                             }
                         )
                     },
                     bottomBar = {
-                        BottomNavBar(
-                            selectedItem = selectedTab,
-                            onItemSelected = { index ->
-                                if (selectedTab == index) {
-                                    coroutineScope.launch {
-                                        when (index) {
-                                            0 -> jmNewsListState.animateScrollToItem(0)
-                                            1 -> learningListState.animateScrollToItem(0)
-                                            2 -> Unit
+                        if (!focusMode) {
+                            BottomNavBar(
+                                selectedItem = selectedTab,
+                                onItemSelected = { index ->
+                                    if (selectedTab == index) {
+                                        coroutineScope.launch {
+                                            when (index) {
+                                                0 -> jmNewsListState.animateScrollToItem(0)
+                                                1 -> learningListState.animateScrollToItem(0)
+                                                2 -> Unit
+                                            }
                                         }
+                                    } else {
+                                        selectedTab = index
+                                        preferences.edit()
+                                            .putInt(LAST_TAB_INDEX_KEY, index)
+                                            .apply()
                                     }
-                                } else {
-                                    selectedTab = index
-                                    preferences.edit()
-                                        .putInt(LAST_TAB_INDEX_KEY, index)
-                                        .apply()
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                 ) { innerPadding ->
                     Box(
@@ -342,6 +355,7 @@ class MainActivity : ComponentActivity() {
         const val JM_DAILY_REMINDER_ENABLED_KEY = "jm_daily_reminder_enabled"
         const val JM_DAILY_REMINDER_HOUR_KEY = "jm_daily_reminder_hour"
         const val JM_DAILY_REMINDER_MINUTE_KEY = "jm_daily_reminder_minute"
+        const val FOCUS_MODE_KEY = "focus_mode"
     }
 }
 
@@ -350,8 +364,10 @@ fun ThemeMenuBar(
     selectedMode: ThemeMode,
     selectedTab: Int,
     selectedJmSubmenu: JmSubmenu,
+    focusMode: Boolean,
     onModeSelected: (ThemeMode) -> Unit,
-    onJmSubmenuSelected: (JmSubmenu) -> Unit
+    onJmSubmenuSelected: (JmSubmenu) -> Unit,
+    onFocusModeChanged: (Boolean) -> Unit
 ) {
     var showMenu by rememberSaveable { mutableStateOf(false) }
 
@@ -448,6 +464,22 @@ fun ThemeMenuBar(
                             onClick = {
                                 onModeSelected(ThemeMode.AMOLED)
                                 showMenu = false
+                            }
+                        )
+                    }
+                    HorizontalDivider()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Focus Mode")
+                        Switch(
+                            checked = focusMode,
+                            onCheckedChange = {
+                                onFocusModeChanged(it)
                             }
                         )
                     }
