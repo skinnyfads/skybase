@@ -691,8 +691,8 @@ private fun FlashcardExamplesPopover(
     val reading = vocabulary.readings.filter { it.isNotBlank() }.joinToString(", ")
     val backdropInteraction = remember { MutableInteractionSource() }
     val cardInteraction = remember { MutableInteractionSource() }
-    var revealedMeaningIndexes by remember(vocabulary.id, hideExampleMeaning) {
-        mutableStateOf(emptySet<Int>())
+    var revealedMeaningIndex by remember(vocabulary.id, hideExampleMeaning) {
+        mutableStateOf<Int?>(null)
     }
 
     Box(
@@ -764,7 +764,7 @@ private fun FlashcardExamplesPopover(
                         )
                     } else {
                         vocabulary.examples.forEachIndexed { index, example ->
-                            val isMeaningVisible = !hideExampleMeaning || revealedMeaningIndexes.contains(index)
+                            val isMeaningVisible = !hideExampleMeaning || revealedMeaningIndex == index
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -774,11 +774,7 @@ private fun FlashcardExamplesPopover(
                                                 interactionSource = remember { MutableInteractionSource() },
                                                 indication = null,
                                                 onClick = {
-                                                    revealedMeaningIndexes = if (revealedMeaningIndexes.contains(index)) {
-                                                        revealedMeaningIndexes - index
-                                                    } else {
-                                                        revealedMeaningIndexes + index
-                                                    }
+                                                    revealedMeaningIndex = if (revealedMeaningIndex == index) null else index
                                                 }
                                             )
                                         } else {
